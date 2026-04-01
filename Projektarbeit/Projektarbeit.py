@@ -7,6 +7,24 @@ from tkinter import simpledialog
 #import RPi.GPIO as GPIO
 import time
 
+# zeitlich begrenzte PopUps konfigurieren
+def show_timed_message(parent, title, message, timeout=10000, msg_type="info"):
+    """Zeigt eine Meldung die sich nach timeout (ms) automatisch schließt"""
+    popup = tk.Toplevel(parent)
+    popup.title(title)
+    
+    colors = {"info": "#d4edda", "error": "#f8d7da", "warning": "#fff3cd"}
+    bg_color = colors.get(msg_type, "#ffffff")
+    popup.configure(bg=bg_color)
+    
+    label = tk.Label(popup, text=message, font=("Arial", 14), bg=bg_color, padx=20, pady=20)
+    label.pack()
+    
+    ok_button = tk.Button(popup, text="OK", command=popup.destroy, width=10)
+    ok_button.pack(pady=10)
+    
+    popup.after(timeout, popup.destroy)
+
 # GPIO-Pins festlegen
 TRIG_PIN1 = 2399923081678425
 99923081678425
@@ -139,11 +157,20 @@ def open_ausleihen():
         laptop_data = get_laptop(laptopnummer_entry.get())
         personId = person_data[0][0]
         laptopId = laptop_data[0][0]
+
+         # Prüfung ob Laptop schon ausgeliehen wurde
+        conn = sqlite3.connect('laptopverwaltung1.db')
+        cursor = conn.cursor()
+        cursor.execute('''SELECT * FROM ausleihen 
+                      WHERE laptopId = ? AND datum_zurueck IS NULL''', (laptopId,))
+        if cursor.fetchone():
+        show_timed_message(new_window, "Fehler", "Dieser Laptop ist bereits ausgeliehen!", 5000, "error")
+        conn.close()
+            return
+
         datum = datum_entry.get()
         uhrzeit = datetime.now().strftime("%H:%M:%S")
         print(laptopId)
-        # Hier können die Eingaben gespeichert werden
-        messagebox.showinfo("Erfolgreich gespeichert", "Die Daten wurden erfolgreich gespeichert!")
 
        # Füge die Daten in die Datenbank ein
         conn = sqlite3.connect('laptopverwaltung1.db')
@@ -155,6 +182,9 @@ def open_ausleihen():
                     ,(laptopId,))
         conn.commit()
         conn.close()
+
+        # Hier können die Eingaben gespeichert werden
+        show_timed_message(new_window, "Erfolgreich", "Die Daten wurden erfolgreich gespeichert!", 10000, "info")
 
         # Schließe das Fenster
         new_window.destroy()
@@ -424,7 +454,7 @@ def open_laptop_status():
     # Erstelle ein neues Fenster
     new_window = tk.Toplevel(root)
     new_window.title("Bestand")
-
+    new_window.attributes('-zoomed', True)
     laptop_status_data = get_laptop_status()
 
     # Sortiere die Zeilen nach der Spalte "Beschreibung"
