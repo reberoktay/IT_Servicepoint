@@ -457,8 +457,13 @@ def open_laptop_status():
     new_window.attributes('-zoomed', True)
     laptop_status_data = get_laptop_status()
 
-    # Sortiere die Zeilen nach der Spalte "Beschreibung"
-    laptop_status_data = sorted(laptop_status_data, key=lambda x: (x[4] is None, x[4]))
+    # Trenne in vorrätige und ausgeliehene Laptops
+    vorrätig = [x for x in laptop_status_data if x[4] is not None]
+    ausgeliehen = [x for x in laptop_status_data if x[4] is None]
+    
+    # Sortiere jeweils nach Beschreibung
+    vorrätig = sorted(vorrätig, key=lambda x: str(x[2] or ''))
+    ausgeliehen = sorted(ausgeliehen, key=lambda x: str(x[2] or ''))
 
     # Erstelle ein Canvas-Widget
     canvas = tk.Canvas(new_window)
@@ -471,22 +476,35 @@ def open_laptop_status():
     # Füge den Frame dem Canvas hinzu
     canvas.create_window(0, 0, anchor=tk.NW, window=frame)
 
-    # Füge die Daten zum Frame hinzu
-    for i, (laptopId, laptopnummer, beschreibung, lagerplatzId, lagerplatz, vorname, nachname) in enumerate(laptop_status_data):
-        laptop_label = tk.Label(frame, text=f"Laptop {beschreibung}", font=("Arial", 16))
-        laptop_label.grid(row=i, column=0, padx=10, pady=5)
-        lagerplatz_label = tk.Label(frame, text=f"Lagerplatz: {lagerplatz}", font=("Arial", 16))
-        lagerplatz_label.grid(row=i, column=1, padx=10, pady=5)
-        status_text = "ausgeliehen" if lagerplatz is None else "vorrätig"
-        status_color = "red" if lagerplatz is None else "green"
-        status_label = tk.Label(frame, text=status_text, font=("Arial", 16), fg=status_color)
-        status_label.grid(row=i, column=2, padx=10, pady=5)
-        if (nachname != None):
-            vorname_label = tk.Label(frame, text=f"{vorname}", font=("Arial", 16))
-            vorname_label.grid(row=i, column=3, padx=10, pady=5)
-            nachname_label = tk.Label(frame, text=f"{nachname}", font=("Arial", 16))
-            nachname_label.grid(row=i, column=4, padx=10, pady=5)
-        
+    # Linke Seite: Vorrätig
+    frame_links = tk.Frame(frame)
+    frame_links.grid(row=0, column=0, padx=20, pady=10, sticky="nw")
+    
+    header_vorrätig = tk.Label(frame_links, text=f"Vorrätig ({len(vorrätig)})", font=("Arial", 18, "bold"), fg="green")
+    header_vorrätig.grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
+    
+    tk.Label(frame_links, text="Laptop", font=("Arial", 14, "bold")).grid(row=1, column=0, padx=10, pady=5, sticky="w")
+    tk.Label(frame_links, text="Lagerplatz", font=("Arial", 14, "bold")).grid(row=1, column=1, padx=10, pady=5, sticky="w")
+    
+    for i, (laptopId, laptopnummer, beschreibung, lagerplatzId, lagerplatz, vorname, nachname) in enumerate(vorrätig):
+        row = i + 2
+        tk.Label(frame_links, text=f"Laptop {beschreibung}", font=("Arial", 14)).grid(row=row, column=0, padx=10, pady=3, sticky="w")
+        tk.Label(frame_links, text=f"{lagerplatz}", font=("Arial", 14)).grid(row=row, column=1, padx=10, pady=3, sticky="w")
+
+    # Rechte Seite: Ausgeliehen
+    frame_rechts = tk.Frame(frame)
+    frame_rechts.grid(row=0, column=1, padx=20, pady=10, sticky="nw")
+    
+    header_ausgeliehen = tk.Label(frame_rechts, text=f"Ausgeliehen ({len(ausgeliehen)})", font=("Arial", 18, "bold"), fg="red")
+    header_ausgeliehen.grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
+    
+    tk.Label(frame_rechts, text="Laptop", font=("Arial", 14, "bold")).grid(row=1, column=0, padx=10, pady=5, sticky="w")
+    tk.Label(frame_rechts, text="Ausgeliehen an", font=("Arial", 14, "bold")).grid(row=1, column=1, padx=10, pady=5, sticky="w")
+    
+    for i, (laptopId, laptopnummer, beschreibung, lagerplatzId, lagerplatz, vorname, nachname) in enumerate(ausgeliehen):
+        row = i + 2
+        tk.Label(frame_rechts, text=f"Laptop {beschreibung}", font=("Arial", 14)).grid(row=row, column=0, padx=10, pady=3, sticky="w")
+        tk.Label(frame_rechts, text=f"{vorname} {nachname}", font=("Arial", 14)).grid(row=row, column=1, padx=10, pady=3, sticky="w")
 
     # Füge die Scrollbar zum Canvas hinzu
     scrollbar = tk.Scrollbar(new_window, command=canvas.yview)
