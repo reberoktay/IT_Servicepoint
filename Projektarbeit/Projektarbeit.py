@@ -395,11 +395,47 @@ def open_lager_hinzufuegen():
             retry = messagebox.askretrycancel("Falsches Passwort", "Das eingegebene Passwort ist nicht korrekt. Erneut versuchen?")
             if not retry:
                 break  # Beende die Schleife, da der Benutzer keinen erneuten Versuch möchte
+# Finde inaktive Azubis (keine Ausleihe seit 2+ Jahren)
+def get_inaktive_azubis():
+    conn = sqlite3.connect('laptopverwaltung1.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT p.id, p.vorname, p.nachname, MAX(a.datum_ausleih) as letzte_ausleihe
+        FROM personen p
+        LEFT JOIN ausleihen a ON p.id = a.personenId
+        GROUP BY p.id
+        HAVING letzte_ausleihe IS NULL 
+           OR letzte_ausleihe < date("now", "-2 years")
+        ORDER BY p.nachname
+    ''')
+    results = cursor.fetchall()
+    conn.close()
+    return results
+
+# Lösche inaktive Azubis
+def loesche_inaktive_azubis(azubi_ids):
+    conn = sqlite3.connect('laptopverwaltung1.db')
+    cursor = conn.cursor()
+    for azubi_id in azubi_ids:
+        cursor.execute('DELETE FROM personen WHERE id = ?', (azubi_id,))
+    conn.commit()
+    conn.close()
+
+# Prüfe und lösche inaktive Azubis automatisch
+def pruefe_inaktive_azubis():
+    inaktive = get_inaktive_azubis()
+    if not inaktive:
+        return
+    
+    azubi_ids = [a[0] for a in inaktive]
+    loesche_inaktive_azubis(azubi_ids)
+    show_timed_message(root, "Bereinigt", f"{len(inaktive)} inaktive Azubi(s) wurden gelöscht.", 5000, "info")
+
 # Öffne das Fenster "Person hinzufügen"
 def open_person_hinzufuegen():
 
     new_window = tk.Toplevel(root)
-    new_window.title("Lagerplatz hinzufügen") 
+    new_window.title("Person hinzufügen") 
     new_window.configure (bg="blue")
 
     stammnummer_label = tk.Label(new_window, text="Stammnummer:")
@@ -422,9 +458,6 @@ def open_person_hinzufuegen():
         nachname = nachname_entry.get()
         stammnummer = stammnummer_entry.get()
 
-        # Hier können die Eingaben weiterverarbeitet oder gespeichert werden
-        messagebox.showinfo("Erfolgreich hinzugefügt", "Die Person wurde erfolgreich hinzugefügt!")
-
         # Füge die Daten in die Datenbank ein
         conn = sqlite3.connect('laptopverwaltung1.db')
         cursor = conn.cursor()
@@ -435,6 +468,12 @@ def open_person_hinzufuegen():
 
         # Schließe das Fenster
         new_window.destroy()
+        
+        # Erfolgsmeldung
+        show_timed_message(root, "Erfolgreich", "Die Person wurde erfolgreich hinzugefügt!", 3000, "info")
+        
+        # Prüfe auf inaktive Azubis
+        pruefe_inaktive_azubis()
 
     # Hinzufügen Button
     button_hinzufuegen = Button(new_window, text="Hinzufügen", command=person_hinzufuegen_speichern)
