@@ -96,6 +96,7 @@ def open_ausleihen():
     stammnummer_label.grid(row=0, column=0, padx=10, pady=5)
     stammnummer_entry = tk.Entry(new_window)
     stammnummer_entry.grid(row=0, column=1, padx=10, pady=5)
+    stammnummer_entry.focus_set()
 
     nachname_label = tk.Label(new_window, text="Nachname:")
     nachname_label.grid(row=1, column=0, padx=10, pady=5)
@@ -207,6 +208,7 @@ def open_abgeben():
     laptopnummer_label.grid(row=1, column=0, padx=10, pady=5)
     laptopnummer_entry = tk.Entry(new_window)
     laptopnummer_entry.grid(row=1, column=1, padx=10, pady=5)
+    laptopnummer_entry.focus_set()
 
     lagerplatz_label = tk.Label(new_window, text="Lagerplatz:")
     lagerplatz_label.grid(row=2, column=0, padx=10, pady=5)
@@ -302,6 +304,7 @@ def open_laptop_hinzufuegen():
             laptopnummer_label.grid(row=1, column=0, padx=10, pady=5)
             laptopnummer_entry = tk.Entry(new_window)
             laptopnummer_entry.grid(row=1, column=1, padx=10, pady=5)
+            laptopnummer_entry.focus_set()
 
             beschreibung_label = tk.Label(new_window, text="Beschreibung:")
             beschreibung_label.grid(row=2, column=0, padx=10, pady=5)
@@ -372,6 +375,7 @@ def open_lager_hinzufuegen():
             lagerplatznummer_label.grid(row=1, column=0, padx=10, pady=5)
             lagerplatznummer_entry = tk.Entry(new_window)
             lagerplatznummer_entry.grid(row=1, column=1, padx=10, pady=5)
+            lagerplatznummer_entry.focus_set()
 
             def lag_hinzufuegen_speichern():
                 lagerplatznummer = lagerplatznummer_entry.get()
@@ -450,6 +454,7 @@ def open_person_hinzufuegen():
     stammnummer_label.grid(row=0, column=0, padx=10, pady=5)
     stammnummer_entry = tk.Entry(new_window)
     stammnummer_entry.grid(row=0, column=1, padx=10, pady=5)
+    stammnummer_entry.focus_set()
 
     nachname_label = tk.Label(new_window, text="Nachname:")
     nachname_label.grid(row=1, column=0, padx=10, pady=5)
