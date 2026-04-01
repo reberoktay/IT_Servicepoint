@@ -213,6 +213,14 @@ def open_abgeben():
     lagerplatz_entry = tk.Entry(new_window)
     lagerplatz_entry.grid(row=2, column=1, padx=10, pady=5)
 
+    # Kopiere Laptopnummer automatisch in Lagerplatz
+    def laptopnummer_changed(event):
+        lagerplatz_entry.delete(0, END)
+        lagerplatz_entry.insert(0, laptopnummer_entry.get())
+    
+    laptopnummer_entry.bind("<FocusOut>", laptopnummer_changed)
+    laptopnummer_entry.bind("<Return>", laptopnummer_changed)
+
     datum_label = tk.Label(new_window, text="Datum:")
     datum_label.grid(row=3, column=0, padx=10, pady=5)
 
