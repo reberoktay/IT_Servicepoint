@@ -108,7 +108,7 @@ def open_ausleihen():
     vorname_entry = tk.Entry(new_window)
     vorname_entry.grid(row=2, column=1, padx=10, pady=5)
 
-    laptopnummer_label = tk.Label(new_window, text="Laptopnum    mer:")
+    laptopnummer_label = tk.Label(new_window, text="Laptopnummer:")
     laptopnummer_label.grid(row=3, column=0, padx=10, pady=5)
     laptopnummer_entry = tk.Entry(new_window)
     laptopnummer_entry.grid(row=3, column=1, padx=10, pady=5)
@@ -325,7 +325,7 @@ def open_laptop_hinzufuegen():
                # print(lagerplatzId)
 
                 # Hier können die Eingaben weiterverarbeitet oder gespeichert werden
-                messagebox.showinfo("Erfolgreich hinzugefügt", "Der Laptop wurde erfplgreich hinzugefügt!")
+                messagebox.showinfo("Erfolgreich hinzugefügt", "Der Laptop wurde erfolgreich hinzugefügt!")
 
                 # Füge die Daten in die Datenbank ein
                 conn = sqlite3.connect('laptopverwaltung1.db')
@@ -381,7 +381,7 @@ def open_lager_hinzufuegen():
                 lagerplatznummer = lagerplatznummer_entry.get()
 
                 # Hier können die Eingaben weiterverarbeitet oder gespeichert werden
-                messagebox.showinfo("Erfolgreich hinzugefügt", "Der Lagerplatz wurde erfplgreich hinzugefügt!")
+                messagebox.showinfo("Erfolgreich hinzugefügt", "Der Lagerplatz wurde erfolgreich hinzugefügt!")
 
                 # Füge die Daten in die Datenbank ein
                 conn = sqlite3.connect('laptopverwaltung1.db')
