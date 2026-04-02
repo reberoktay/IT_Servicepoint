@@ -278,8 +278,8 @@ def open_abgeben():
     # Abgeben Button
     button_abgeben = Button(new_window, text="Abgeben", command=abgeben_speichern)
     button_abgeben.grid(row=5, column=1, padx=5, pady=5)
-# Öffne das Fenster "Laptop hinzufügen"
 
+# Öffne das Fenster "Laptop hinzufügen"
 def get_lagerplatz(lagerplatz: int):
     conn = sqlite3.connect('laptopverwaltung1.db')
     cursor = conn.cursor()
@@ -358,6 +358,7 @@ def open_laptop_hinzufuegen():
             retry = messagebox.askretrycancel("Falsches Passwort", "Das eingegebene Passwort ist nicht korrekt. Erneut versuchen?")
             if not retry:
                 break  # Beende die Schleife, da der Benutzer keinen erneuten Versuch möchte
+
 # Öffne das Fenster "Lagerplatz hinzufügen"
 def open_lager_hinzufuegen():
 
@@ -407,6 +408,7 @@ def open_lager_hinzufuegen():
             retry = messagebox.askretrycancel("Falsches Passwort", "Das eingegebene Passwort ist nicht korrekt. Erneut versuchen?")
             if not retry:
                 break  # Beende die Schleife, da der Benutzer keinen erneuten Versuch möchte
+
 # Finde inaktive Azubis (keine Ausleihe seit 2+ Jahren)
 def get_inaktive_azubis():
     conn = sqlite3.connect('laptopverwaltung1.db')
@@ -503,6 +505,7 @@ def get_laptop_status():
 
 # Öffne das Fenster "Laptopstatus anzeigen"
 def open_laptop_status():
+
     # Erstelle ein neues Fenster
     new_window = tk.Toplevel(root)
     new_window.title("Bestand")
