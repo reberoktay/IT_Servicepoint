@@ -126,27 +126,26 @@ def setup_styles():
     style.map("Secondary.TButton",
               background=[("active", COLORS["bg_hover"]), ("pressed", COLORS["border"])])
 
-    # Grosse Buttons fuer Hauptfenster
-    style.configure("MainPrimary.TButton", background=COLORS["accent_blue"],
-                    foreground="white", font=FONT_BTN_MAIN, padding=(24, 28))
-    style.map("MainPrimary.TButton",
-              background=[("active", "#1d4ed8"), ("pressed", "#1e40af")])
-
-    style.configure("MainSuccess.TButton", background=COLORS["accent_green"],
-                    foreground="white", font=FONT_BTN_MAIN, padding=(24, 28))
-    style.map("MainSuccess.TButton",
-              background=[("active", "#15803d"), ("pressed", "#166534")])
-
-    style.configure("MainSecondary.TButton", background=COLORS["bg_card"],
+    # Grosse Buttons fuer Hauptfenster (farblos, blau bei Hover)
+    style.configure("MainButton.TButton", background=COLORS["bg_card"],
                     foreground=COLORS["text"], font=FONT_BTN_MAIN, padding=(24, 28),
                     borderwidth=1, relief="solid")
-    style.map("MainSecondary.TButton",
-              background=[("active", COLORS["bg_hover"]), ("pressed", COLORS["border"])])
+    style.map("MainButton.TButton",
+              background=[("active", COLORS["accent_blue"])],
+              foreground=[("active", "white")])
 
     style.configure("Form.TButton", background=COLORS["accent_blue"],
                     foreground="white", font=FONT_BTN, padding=(20, 10))
     style.map("Form.TButton",
               background=[("active", "#1d4ed8"), ("pressed", "#1e40af")])
+
+    # Close Button (X oben rechts)
+    style.configure("Close.TButton", background=COLORS["bg_topbar"],
+                    foreground=COLORS["text_muted"], font=("Segoe UI", 14),
+                    padding=(8, 2), borderwidth=0, relief="flat")
+    style.map("Close.TButton",
+              foreground=[("active", COLORS["red_text"])],
+              background=[("active", COLORS["bg_topbar"])])
 
     # Entry
     style.configure("TEntry", fieldbackground=COLORS["entry_bg"],
@@ -237,8 +236,11 @@ def create_form_window(title):
     # Topbar
     topbar = ttk.Frame(window, style="Topbar.TFrame")
     topbar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=0, pady=0)
-    ttk.Label(topbar, text="IT-Servicepoint", style="Topbar.TLabel").pack(
-        anchor="w", padx=16, pady=8)
+    topbar.columnconfigure(0, weight=1)
+    ttk.Label(topbar, text="IT-Servicepoint", style="Topbar.TLabel").grid(
+        row=0, column=0, sticky="w", padx=16, pady=8)
+    ttk.Button(topbar, text="\u2715", style="Close.TButton",
+               command=window.destroy).grid(row=0, column=1, sticky="e", padx=(0, 8), pady=4)
 
     # Separator
     sep = tk.Frame(window, bg=COLORS["border"], height=1)
@@ -440,7 +442,7 @@ def open_ausleihen():
         conn.commit()
         conn.close()
 
-        show_timed_message(window, "Erfolgreich",
+        show_timed_message(root, "Erfolgreich",
                            "Die Daten wurden erfolgreich gespeichert!", 10000, "info")
         window.destroy()
 
@@ -515,7 +517,7 @@ def open_abgeben():
         conn.commit()
         conn.close()
 
-        show_timed_message(window, "Erfolgreich",
+        show_timed_message(root, "Erfolgreich",
                            "Die Daten wurden erfolgreich abgegeben!", 5000, "info")
         window.destroy()
 
@@ -593,9 +595,35 @@ def open_person_hinzufuegen():
     vorname_entry     = add_field(window, "Vorname:", 2)
 
     def person_hinzufuegen_speichern():
-        vorname = vorname_entry.get()
-        nachname = nachname_entry.get()
-        stammnummer = stammnummer_entry.get()
+        vorname = vorname_entry.get().strip()
+        nachname = nachname_entry.get().strip()
+        stammnummer = stammnummer_entry.get().strip()
+
+        # Stammnummer validieren: genau 6 Ziffern
+        if not stammnummer:
+            show_timed_message(window, "Fehler",
+                               "Bitte Stammnummer eingeben!", 5000, "error")
+            return
+        if not stammnummer.isdigit() or len(stammnummer) != 6:
+            show_timed_message(window, "Fehler",
+                               "Stammnummer muss genau 6 Ziffern haben (0-9)!", 5000, "error")
+            return
+
+        # Pruefen ob Stammnummer bereits existiert
+        existing = get_person(stammnummer)
+        if existing:
+            show_timed_message(window, "Fehler",
+                               f"Stammnummer {stammnummer} ist bereits vergeben!", 5000, "error")
+            return
+
+        if not nachname:
+            show_timed_message(window, "Fehler",
+                               "Bitte Nachname eingeben!", 5000, "error")
+            return
+        if not vorname:
+            show_timed_message(window, "Fehler",
+                               "Bitte Vorname eingeben!", 5000, "error")
+            return
 
         db_query('INSERT INTO personen (nachname, vorname, stammnummer) VALUES (?, ?, ?)',
                  (nachname, vorname, stammnummer), fetch=False, commit=True)
@@ -636,7 +664,9 @@ def open_laptop_status():
     topbar = ttk.Frame(new_window, style="Topbar.TFrame")
     topbar.pack(fill=tk.X)
     ttk.Label(topbar, text="IT-Servicepoint", style="Topbar.TLabel").pack(
-        anchor="w", padx=16, pady=8)
+        side=tk.LEFT, padx=16, pady=8)
+    ttk.Button(topbar, text="\u2715", style="Close.TButton",
+               command=new_window.destroy).pack(side=tk.RIGHT, padx=(0, 12), pady=4)
 
     sep = tk.Frame(new_window, bg=COLORS["border"], height=1)
     sep.pack(fill=tk.X)
@@ -785,7 +815,9 @@ setup_styles()
 topbar = ttk.Frame(root, style="Topbar.TFrame")
 topbar.pack(fill=tk.X)
 ttk.Label(topbar, text="IT-Servicepoint", style="Topbar.TLabel").pack(
-    anchor="w", padx=16, pady=8)
+    side=tk.LEFT, padx=16, pady=8)
+ttk.Button(topbar, text="\u2715", style="Close.TButton",
+           command=root.destroy).pack(side=tk.RIGHT, padx=(0, 12), pady=4)
 
 # Separator
 sep = tk.Frame(root, bg=COLORS["border"], height=1)
@@ -800,12 +832,12 @@ ttk.Label(content_frame, text="Laptopverwaltung", style="Title.TLabel").pack(pad
 
 # Button-Definitionen (mit Singleton-Wrapping und grossen Styles)
 MENU_ITEMS = [
-    ("Ausleihen",         _wrap_singleton("Ausleihen", open_ausleihen),            "MainPrimary.TButton"),
-    ("Abgeben",           _wrap_singleton("Abgeben", open_abgeben),                "MainSuccess.TButton"),
-    ("Neue Person",       _wrap_singleton("Person hinzufuegen", open_person_hinzufuegen),  "MainSecondary.TButton"),
-    ("Neuer Laptop",      _wrap_singleton("Laptop hinzufuegen", open_laptop_hinzufuegen),  "MainSecondary.TButton"),
-    ("Neuer Lagerplatz",  _wrap_singleton("Lagerplatz hinzufuegen", open_lager_hinzufuegen), "MainSecondary.TButton"),
-    ("Aktueller Bestand", _wrap_singleton("Bestand", open_laptop_status),          "MainSecondary.TButton"),
+    ("Ausleihen",         _wrap_singleton("Ausleihen", open_ausleihen),            "MainButton.TButton"),
+    ("Abgeben",           _wrap_singleton("Abgeben", open_abgeben),                "MainButton.TButton"),
+    ("Neue Person",       _wrap_singleton("Person hinzufuegen", open_person_hinzufuegen),  "MainButton.TButton"),
+    ("Neuer Laptop",      _wrap_singleton("Laptop hinzufuegen", open_laptop_hinzufuegen),  "MainButton.TButton"),
+    ("Neuer Lagerplatz",  _wrap_singleton("Lagerplatz hinzufuegen", open_lager_hinzufuegen), "MainButton.TButton"),
+    ("Aktueller Bestand", _wrap_singleton("Bestand", open_laptop_status),          "MainButton.TButton"),
 ]
 
 # Buttons im 2er-Grid — gross und flaechenfuellend
