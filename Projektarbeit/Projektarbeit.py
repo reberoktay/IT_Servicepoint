@@ -593,7 +593,12 @@ def open_laptop_status():
     new_window = tk.Toplevel(root)
     new_window.title("Bestand")
     new_window.configure(bg=COLORS["bg"])
-    new_window.attributes('-zoomed', True)
+    try:
+        new_window.attributes('-zoomed', True)
+    except:
+        pass
+    new_window.attributes('-fullscreen', True)
+    new_window.bind("<Escape>", lambda e: new_window.attributes('-fullscreen', False))
 
     laptop_status_data = get_laptop_status()
 
@@ -697,7 +702,16 @@ def open_laptop_status():
 root = tk.Tk()
 root.title("IT-Servicepoint")
 root.configure(bg=COLORS["bg"])
-root.attributes('-zoomed', True)
+
+# Fullscreen: mehrere Methoden fuer maximale Kompatibilitaet (Pi + Desktop)
+try:
+    root.attributes('-zoomed', True)
+except:
+    pass
+root.attributes('-fullscreen', True)
+
+# Escape zum Beenden des Fullscreen (praktisch beim Entwickeln)
+root.bind("<Escape>", lambda e: root.attributes('-fullscreen', False))
 
 setup_styles()
 
