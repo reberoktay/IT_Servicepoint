@@ -697,8 +697,7 @@ def open_laptop_status():
 root = tk.Tk()
 root.title("IT-Servicepoint")
 root.configure(bg=COLORS["bg"])
-root.geometry("460x520")
-root.resizable(False, False)
+root.attributes('-zoomed', True)
 
 setup_styles()
 
@@ -712,8 +711,12 @@ ttk.Label(topbar, text="IT-Servicepoint", style="Topbar.TLabel").pack(
 sep = tk.Frame(root, bg=COLORS["border"], height=1)
 sep.pack(fill=tk.X)
 
+# Content zentriert (expand fuer vertikale Zentrierung)
+content_frame = ttk.Frame(root)
+content_frame.pack(expand=True)
+
 # Titel zentriert
-ttk.Label(root, text="Laptopverwaltung", style="Title.TLabel").pack(pady=(28, 24))
+ttk.Label(content_frame, text="Laptopverwaltung", style="Title.TLabel").pack(pady=(0, 24))
 
 # Button-Definitionen
 MENU_ITEMS = [
@@ -726,7 +729,7 @@ MENU_ITEMS = [
 ]
 
 # Buttons im 2er-Grid
-btn_frame = ttk.Frame(root)
+btn_frame = ttk.Frame(content_frame)
 btn_frame.pack(padx=24, fill=tk.X)
 btn_frame.columnconfigure(0, weight=1)
 btn_frame.columnconfigure(1, weight=1)
@@ -735,6 +738,6 @@ for i, (text, command, style) in enumerate(MENU_ITEMS):
     row = i // 2
     col = i % 2
     btn = ttk.Button(btn_frame, text=text, command=command, style=style)
-    btn.grid(row=row, column=col, padx=4, pady=4, sticky="ew")
+    btn.grid(row=row, column=col, padx=6, pady=6, sticky="ew")
 
 root.mainloop()
