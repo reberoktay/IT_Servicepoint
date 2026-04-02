@@ -66,9 +66,10 @@ COLORS = {
 
 FONT       = ("Segoe UI", 12)
 FONT_SMALL = ("Segoe UI", 10)
-FONT_TITLE = ("Segoe UI", 20)
+FONT_TITLE = ("Segoe UI", 28)
 FONT_HEAD  = ("Segoe UI", 14, "bold")
 FONT_BTN   = ("Segoe UI", 13)
+FONT_BTN_MAIN = ("Segoe UI", 18)
 
 
 def setup_styles():
@@ -123,6 +124,23 @@ def setup_styles():
                     foreground=COLORS["text"], font=FONT_BTN, padding=(16, 12),
                     borderwidth=1, relief="solid")
     style.map("Secondary.TButton",
+              background=[("active", COLORS["bg_hover"]), ("pressed", COLORS["border"])])
+
+    # Grosse Buttons fuer Hauptfenster
+    style.configure("MainPrimary.TButton", background=COLORS["accent_blue"],
+                    foreground="white", font=FONT_BTN_MAIN, padding=(24, 28))
+    style.map("MainPrimary.TButton",
+              background=[("active", "#1d4ed8"), ("pressed", "#1e40af")])
+
+    style.configure("MainSuccess.TButton", background=COLORS["accent_green"],
+                    foreground="white", font=FONT_BTN_MAIN, padding=(24, 28))
+    style.map("MainSuccess.TButton",
+              background=[("active", "#15803d"), ("pressed", "#166534")])
+
+    style.configure("MainSecondary.TButton", background=COLORS["bg_card"],
+                    foreground=COLORS["text"], font=FONT_BTN_MAIN, padding=(24, 28),
+                    borderwidth=1, relief="solid")
+    style.map("MainSecondary.TButton",
               background=[("active", COLORS["bg_hover"]), ("pressed", COLORS["border"])])
 
     style.configure("Form.TButton", background=COLORS["accent_blue"],
@@ -212,6 +230,9 @@ def create_form_window(title):
     window.title(title)
     window.configure(bg=COLORS["bg"])
     window.resizable(False, False)
+
+    # Im Singleton-Tracker registrieren
+    _register_window(title, window)
 
     # Topbar
     topbar = ttk.Frame(window, style="Topbar.TFrame")
@@ -600,6 +621,9 @@ def open_laptop_status():
     new_window.attributes('-fullscreen', True)
     new_window.bind("<Escape>", lambda e: new_window.attributes('-fullscreen', False))
 
+    # Im Singleton-Tracker registrieren
+    _register_window("Bestand", new_window)
+
     laptop_status_data = get_laptop_status()
 
     # Trenne in vorrätige und ausgeliehene Laptops
@@ -699,6 +723,48 @@ def open_laptop_status():
 
 # ==================== Hauptfenster ====================
 
+# Singleton-Tracker: verhindert mehrfaches Oeffnen desselben Fensters
+_open_windows = {}
+
+def open_singleton(name, open_func):
+    """Oeffnet ein Fenster nur einmal. Bei erneutem Klick wird das bestehende hervorgehoben."""
+    if name in _open_windows:
+        win = _open_windows[name]
+        try:
+            if win.winfo_exists():
+                win.lift()
+                win.focus_force()
+                return
+        except:
+            pass
+        del _open_windows[name]
+    open_func()
+
+def _wrap_singleton(name, open_func):
+    """Wrapped eine open_*-Funktion mit Singleton-Logik."""
+    original = open_func
+
+    def wrapper():
+        if name in _open_windows:
+            win = _open_windows[name]
+            try:
+                if win.winfo_exists():
+                    win.lift()
+                    win.focus_force()
+                    return
+            except:
+                pass
+            del _open_windows[name]
+        original()
+
+    return wrapper
+
+def _register_window(name, window):
+    """Registriert ein Fenster im Singleton-Tracker."""
+    _open_windows[name] = window
+    window.bind("<Destroy>", lambda e: _open_windows.pop(name, None) if e.widget == window else None)
+
+
 root = tk.Tk()
 root.title("IT-Servicepoint")
 root.configure(bg=COLORS["bg"])
@@ -727,31 +793,34 @@ sep.pack(fill=tk.X)
 
 # Content zentriert (expand fuer vertikale Zentrierung)
 content_frame = ttk.Frame(root)
-content_frame.pack(expand=True)
+content_frame.pack(expand=True, fill=tk.BOTH, padx=40, pady=(20, 40))
 
 # Titel zentriert
-ttk.Label(content_frame, text="Laptopverwaltung", style="Title.TLabel").pack(pady=(0, 24))
+ttk.Label(content_frame, text="Laptopverwaltung", style="Title.TLabel").pack(pady=(20, 24))
 
-# Button-Definitionen
+# Button-Definitionen (mit Singleton-Wrapping und grossen Styles)
 MENU_ITEMS = [
-    ("Ausleihen",              open_ausleihen,           "Primary.TButton"),
-    ("Abgeben",                open_abgeben,             "Success.TButton"),
-    ("Neue Person",            open_person_hinzufuegen,  "Secondary.TButton"),
-    ("Neuer Laptop",           open_laptop_hinzufuegen,  "Secondary.TButton"),
-    ("Neuer Lagerplatz",       open_lager_hinzufuegen,   "Secondary.TButton"),
-    ("Aktueller Bestand",      open_laptop_status,       "Secondary.TButton"),
+    ("Ausleihen",         _wrap_singleton("Ausleihen", open_ausleihen),            "MainPrimary.TButton"),
+    ("Abgeben",           _wrap_singleton("Abgeben", open_abgeben),                "MainSuccess.TButton"),
+    ("Neue Person",       _wrap_singleton("Person hinzufuegen", open_person_hinzufuegen),  "MainSecondary.TButton"),
+    ("Neuer Laptop",      _wrap_singleton("Laptop hinzufuegen", open_laptop_hinzufuegen),  "MainSecondary.TButton"),
+    ("Neuer Lagerplatz",  _wrap_singleton("Lagerplatz hinzufuegen", open_lager_hinzufuegen), "MainSecondary.TButton"),
+    ("Aktueller Bestand", _wrap_singleton("Bestand", open_laptop_status),          "MainSecondary.TButton"),
 ]
 
-# Buttons im 2er-Grid
+# Buttons im 2er-Grid — gross und flaechenfuellend
 btn_frame = ttk.Frame(content_frame)
-btn_frame.pack(padx=24, fill=tk.X)
+btn_frame.pack(padx=48, fill=tk.BOTH, expand=True)
 btn_frame.columnconfigure(0, weight=1)
 btn_frame.columnconfigure(1, weight=1)
+btn_frame.rowconfigure(0, weight=1)
+btn_frame.rowconfigure(1, weight=1)
+btn_frame.rowconfigure(2, weight=1)
 
 for i, (text, command, style) in enumerate(MENU_ITEMS):
     row = i // 2
     col = i % 2
     btn = ttk.Button(btn_frame, text=text, command=command, style=style)
-    btn.grid(row=row, column=col, padx=6, pady=6, sticky="ew")
+    btn.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
 
 root.mainloop()
