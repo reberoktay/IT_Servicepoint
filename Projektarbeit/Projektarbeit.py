@@ -7,7 +7,39 @@ from tkinter import simpledialog
 #import RPi.GPIO as GPIO
 import time
 
-# zeitlich begrenzte PopUps konfigurieren
+# ==================== Konfiguration ====================
+
+DB_PATH = 'laptopverwaltung1.db'
+password = "Projektarbeit"
+distance = 30
+
+# GPIO-Pins festlegen
+TRIG_PIN1 = 23
+ECHO_PIN1 = 24
+TRIG_PIN2 = 21
+ECHO_PIN2 = 22
+
+# GPIO-Modus festlegen
+#GPIO.setmode(GPIO.BCM)
+#GPIO.setup(TRIG_PIN, GPIO.OUT)
+#GPIO.setup(ECHO_PIN, GPIO.IN)
+
+#def get_distance():
+    # GPIO.output(TRIG_PIN, True)
+    # time.sleep(0.00001)
+    # GPIO.output(TRIG_PIN, False)
+    # start_time = time.time()
+    # end_time = time.time()
+    # while GPIO.input(ECHO_PIN) == 0:
+    #     start_time = time.time()
+    # while GPIO.input(ECHO_PIN) == 1:
+    #     end_time = time.time()
+    # duration = end_time - start_time
+    # distance = (343 * duration) / 2
+    # return distance
+
+# ==================== Helper-Funktionen ====================
+
 def show_timed_message(parent, title, message, timeout=10000, msg_type="info"):
     """Zeigt eine Meldung die sich nach timeout (ms) automatisch schließt"""
     popup = tk.Toplevel(parent)
@@ -25,133 +57,146 @@ def show_timed_message(parent, title, message, timeout=10000, msg_type="info"):
     
     popup.after(timeout, popup.destroy)
 
-# GPIO-Pins festlegen
-TRIG_PIN1 = 2399923081678425
-99923081678425
 
-ECHO_PIN1 = 24
-TRIG_PIN2 = 21
-ECHO_PIN2 = 22
-
-# GPIO-Modus festlegen
-#GPIO.setmode(GPIO.BCM)
-
-# GPIO-Pins als Ein- oder Ausgang konfigurieren
-#GPIO.setup(TRIG_PIN, GPIO.OUT)
-#GPIO.setup(ECHO_PIN, GPIO.IN)
-
-
-password = "Projektarbeit"
-distance = 30
-
-#def get_distance():
-    # # Trigger-Pin auf HIGH setzen (Signal senden)
-    # GPIO.output(TRIG_PIN, True)
-    # time.sleep(0.00001)
-    # GPIO.output(TRIG_PIN, False)
-
-    # # Start- und Endzeitpunkt der Echo-Impulse festlegen
-    # start_time = time.time()
-    # end_time = time.time()
-
-    # while GPIO.input(ECHO_PIN) == 0:
-    #     start_time = time.time()
-
-    # while GPIO.input(ECHO_PIN) == 1:
-    #     end_time = time.time()
-
-    # # Dauer des Echo-Impulses berechnen
-    # duration = end_time - start_time
-
-    # # Schallgeschwindigkeit (343 m/s) und Formel s = v * t / 2 verwenden, um die Entfernung zu berechnen
-    # distance = (343 * duration) / 2
-
-    # return distance
-
-def get_person(stammnummer: int):
-    conn = sqlite3.connect('laptopverwaltung1.db')
+def db_query(sql, params=(), fetch=True, commit=False):
+    """Zentrale DB-Funktion: führt Query aus, gibt Ergebnis zurück oder committed."""
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM personen WHERE stammnummer= ' + stammnummer)
-    person_data = cursor.fetchall()
+    cursor.execute(sql, params)
+    result = cursor.fetchall() if fetch else None
+    if commit:
+        conn.commit()
     conn.close()
-    return person_data
+    return result
 
-def get_laptop(laptopnummer: int):
-    conn = sqlite3.connect('laptopverwaltung1.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM laptop WHERE laptopnummer= ' + laptopnummer)
-    laptop_data = cursor.fetchall()
-    conn.close()
-    return laptop_data
 
-# Öffne neues Fenster "Ausleihen"
-def open_ausleihen():
-    # Erstelle ein neues Fenster
-    new_window = tk.Toplevel(root)
-    new_window.title("Ausleihen")
-    new_window.configure (bg="grey")
+def create_form_window(title, bg="grey"):
+    """Erstellt ein neues Toplevel-Fenster mit Titel und Hintergrundfarbe."""
+    window = tk.Toplevel(root)
+    window.title(title)
+    window.configure(bg=bg)
+    return window
 
-    # Erstelle Label und Entry Widgets für Name, Stammnummer, Laptopnummer und Datum
-    stammnummer_label = tk.Label(new_window, text="Stammnummer:")
-    stammnummer_label.grid(row=0, column=0, padx=10, pady=5)
-    stammnummer_entry = tk.Entry(new_window)
-    stammnummer_entry.grid(row=0, column=1, padx=10, pady=5)
-    stammnummer_entry.focus_set()
 
-    nachname_label = tk.Label(new_window, text="Nachname:")
-    nachname_label.grid(row=1, column=0, padx=10, pady=5)
-    nachname_entry = tk.Entry(new_window)
-    nachname_entry.grid(row=1, column=1, padx=10, pady=5)
+def add_field(window, label_text, row, focus=False, readonly=False, default=None):
+    """Erstellt ein Label+Entry-Paar im Grid und gibt das Entry zurück."""
+    tk.Label(window, text=label_text).grid(row=row, column=0, padx=10, pady=5)
+    state = 'readonly' if readonly else 'normal'
+    entry = tk.Entry(window, state=state)
+    entry.grid(row=row, column=1, padx=10, pady=5)
+    if default and not readonly:
+        entry.insert(0, default)
+    if focus:
+        entry.focus_set()
+    return entry
 
-    vorname_label = tk.Label(new_window, text="Vorname:")
-    vorname_label.grid(row=2, column=0, padx=10, pady=5)
-    vorname_entry = tk.Entry(new_window)
-    vorname_entry.grid(row=2, column=1, padx=10, pady=5)
 
-    laptopnummer_label = tk.Label(new_window, text="Laptopnummer:")
-    laptopnummer_label.grid(row=3, column=0, padx=10, pady=5)
-    laptopnummer_entry = tk.Entry(new_window)
-    laptopnummer_entry.grid(row=3, column=1, padx=10, pady=5)
+def add_uhrzeit_field(window, row):
+    """Erstellt ein sich automatisch aktualisierendes Uhrzeit-Feld."""
+    tk.Label(window, text="Uhrzeit:").grid(row=row, column=0, padx=10, pady=5)
+    uhrzeit_entry = tk.Entry(window, state='readonly')
+    uhrzeit_entry.grid(row=row, column=1, padx=10, pady=5)
 
-    datum_label = tk.Label(new_window, text="Datum:")
-    datum_label.grid(row=4, column=0, padx=10, pady=5)
-
-    # Setze das aktuelle Datum als Standardwert im Datumseingabefeld
-    today = datetime.today().strftime('%Y-%m-%d')
-    datum_entry = tk.Entry(new_window)
-    datum_entry.insert(0, today)
-    datum_entry.grid(row=4, column=1, padx=10, pady=5)
-
-       # Erstelle Label Widget für Uhrzeit
-    uhrzeit_label = tk.Label(new_window, text="Uhrzeit:")
-    uhrzeit_label.grid(row=5, column=0, padx=10, pady=5)
-
-    # Die Funktion wird durch ein Event gesteuert, dann werden alle Personendaten zu der jeweiligen Stammnummer
-    # gespeichert. Inhalt der Felder wird gelöscht. Neuer Inhalt wird aus person_data extrahiert und in die 
-    # Spalte geschrieben 
-    def stammnummer_focusout(event):
-        person_data = get_person(stammnummer_entry.get())
-        nachname_entry.delete(0,END)
-        nachname_entry.insert(0, person_data[0][1])
-        vorname_entry.delete(0,END)
-        vorname_entry.insert(0, person_data[0][2])
-
-    #stammnummer_focusout wird an ein Ereignis gebunden 
-    stammnummer_entry.bind("<FocusOut>", stammnummer_focusout)
-
-    # Aktualisiere die Uhrzeit alle 1000 Millisekunden
     def update_uhrzeit():
         now = datetime.now().strftime("%H:%M:%S")
         uhrzeit_entry.configure(state='normal')
         uhrzeit_entry.delete(0, tk.END)
         uhrzeit_entry.insert(0, now)
         uhrzeit_entry.configure(state='readonly')
-        new_window.after(1000, update_uhrzeit)
+        window.after(1000, update_uhrzeit)
 
-    # Erstelle Eingabefeld für Uhrzeit und starte den Update-Prozess
-    uhrzeit_entry = tk.Entry(new_window, state='readonly')
-    uhrzeit_entry.grid(row=5, column=1, padx=10, pady=5)
     update_uhrzeit()
+    return uhrzeit_entry
+
+
+def add_button(window, text, command, row):
+    """Erstellt einen Button im Grid."""
+    btn = Button(window, text=text, command=command)
+    btn.grid(row=row, column=1, padx=5, pady=5)
+    return btn
+
+
+def passwort_pruefen():
+    """Prüft das Passwort in einer Schleife. Gibt True zurück wenn korrekt, False bei Abbruch."""
+    while True:
+        user_password = simpledialog.askstring("Passwort", "Passwort eingeben", show="*")
+        if user_password == password:
+            return True
+        elif user_password is None:
+            return False
+        else:
+            retry = messagebox.askretrycancel("Falsches Passwort", 
+                "Das eingegebene Passwort ist nicht korrekt. Erneut versuchen?")
+            if not retry:
+                return False
+
+
+# ==================== DB-Abfragen ====================
+
+def get_person(stammnummer):
+    return db_query('SELECT * FROM personen WHERE stammnummer= ' + stammnummer)
+
+def get_laptop(laptopnummer):
+    return db_query('SELECT * FROM laptop WHERE laptopnummer= ' + laptopnummer)
+
+def get_lagerplatz(lagerplatz):
+    return db_query('SELECT * FROM lagerplatz WHERE lagerplatz= ' + lagerplatz)
+
+def get_laptop_status():
+    return db_query('SELECT * FROM laptop_status')
+
+
+# ==================== Inaktive Azubis ====================
+
+def get_inaktive_azubis():
+    return db_query('''
+        SELECT p.id, p.vorname, p.nachname, MAX(a.datum_ausleih) as letzte_ausleihe
+        FROM personen p
+        LEFT JOIN ausleihen a ON p.id = a.personenId
+        GROUP BY p.id
+        HAVING letzte_ausleihe IS NULL 
+           OR letzte_ausleihe < date("now", "-2 years")
+        ORDER BY p.nachname
+    ''')
+
+def loesche_inaktive_azubis(azubi_ids):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    for azubi_id in azubi_ids:
+        cursor.execute('DELETE FROM personen WHERE id = ?', (azubi_id,))
+    conn.commit()
+    conn.close()
+
+def pruefe_inaktive_azubis():
+    inaktive = get_inaktive_azubis()
+    if not inaktive:
+        return
+    azubi_ids = [a[0] for a in inaktive]
+    loesche_inaktive_azubis(azubi_ids)
+    show_timed_message(root, "Bereinigt", f"{len(inaktive)} inaktive Azubi(s) wurden gelöscht.", 5000, "info")
+
+
+# ==================== Fenster: Ausleihen ====================
+
+def open_ausleihen():
+    window = create_form_window("Ausleihen")
+    today = datetime.today().strftime('%Y-%m-%d')
+
+    stammnummer_entry  = add_field(window, "Stammnummer:", 0, focus=True)
+    nachname_entry     = add_field(window, "Nachname:", 1)
+    vorname_entry      = add_field(window, "Vorname:", 2)
+    laptopnummer_entry = add_field(window, "Laptopnummer:", 3)
+    datum_entry        = add_field(window, "Datum:", 4, default=today)
+    uhrzeit_entry      = add_uhrzeit_field(window, 5)
+
+    def stammnummer_focusout(event):
+        person_data = get_person(stammnummer_entry.get())
+        nachname_entry.delete(0, END)
+        nachname_entry.insert(0, person_data[0][1])
+        vorname_entry.delete(0, END)
+        vorname_entry.insert(0, person_data[0][2])
+
+    stammnummer_entry.bind("<FocusOut>", stammnummer_focusout)
 
     def ausleihen_speichern():
         person_data = get_person(stammnummer_entry.get())
@@ -159,96 +204,51 @@ def open_ausleihen():
         personId = person_data[0][0]
         laptopId = laptop_data[0][0]
 
-         # Prüfung ob Laptop schon ausgeliehen wurde
-        conn = sqlite3.connect('laptopverwaltung1.db')
-        cursor = conn.cursor()
-        cursor.execute('''SELECT * FROM ausleihen 
-                      WHERE laptopId = ? AND datum_zurueck IS NULL''', (laptopId,))
-        if cursor.fetchone():
-        show_timed_message(new_window, "Fehler", "Dieser Laptop ist bereits ausgeliehen!", 5000, "error")
-        conn.close()
+        # Prüfung ob Laptop schon ausgeliehen wurde
+        bereits_ausgeliehen = db_query(
+            'SELECT * FROM ausleihen WHERE laptopId = ? AND datum_zurueck IS NULL',
+            (laptopId,))
+        if bereits_ausgeliehen:
+            show_timed_message(window, "Fehler", "Dieser Laptop ist bereits ausgeliehen!", 5000, "error")
             return
 
         datum = datum_entry.get()
         uhrzeit = datetime.now().strftime("%H:%M:%S")
-        print(laptopId)
 
-       # Füge die Daten in die Datenbank ein
-        conn = sqlite3.connect('laptopverwaltung1.db')
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO ausleihen (personenId, laptopId, datum_ausleih, uhrzeit_ausleih)
                           VALUES (?, ?, ?, ?)''', (personId, laptopId, datum, uhrzeit))
-    
-        cursor.execute('''DELETE FROM laptop_lagerplatz WHERE laptopId = ?'''
-                    ,(laptopId,))
+        cursor.execute('DELETE FROM laptop_lagerplatz WHERE laptopId = ?', (laptopId,))
         conn.commit()
         conn.close()
 
-        # Hier können die Eingaben gespeichert werden
-        show_timed_message(new_window, "Erfolgreich", "Die Daten wurden erfolgreich gespeichert!", 10000, "info")
+        show_timed_message(window, "Erfolgreich", "Die Daten wurden erfolgreich gespeichert!", 10000, "info")
+        window.destroy()
 
-        # Schließe das Fenster
-        new_window.destroy()
+    add_button(window, "Senden", ausleihen_speichern, 6)
 
-    # Senden Button
-    button_senden = Button(new_window, text="Senden", command=ausleihen_speichern)
-    button_senden.grid(row=6, column=1, padx=5, pady=5)
-    
-# Öffne das Fenster "Abgeben"
+
+# ==================== Fenster: Abgeben ====================
+
 def open_abgeben():
+    window = create_form_window("Abgeben")
+    today = datetime.today().strftime('%Y-%m-%d')
 
-    # Erstelle ein neues Fenster
-    new_window = tk.Toplevel(root)
-    new_window.title("Abgeben")
-    new_window.configure (bg="grey")
-
-    #laptop_data = get_laptop_status()
-
-    laptopnummer_label = tk.Label(new_window, text="Laptopnummer:")
-    laptopnummer_label.grid(row=1, column=0, padx=10, pady=5)
-    laptopnummer_entry = tk.Entry(new_window)
-    laptopnummer_entry.grid(row=1, column=1, padx=10, pady=5)
-    laptopnummer_entry.focus_set()
-
-    lagerplatz_label = tk.Label(new_window, text="Lagerplatz:")
-    lagerplatz_label.grid(row=2, column=0, padx=10, pady=5)
-    lagerplatz_entry = tk.Entry(new_window)
-    lagerplatz_entry.grid(row=2, column=1, padx=10, pady=5)
+    laptopnummer_entry = add_field(window, "Laptopnummer:", 1, focus=True)
+    lagerplatz_entry   = add_field(window, "Lagerplatz:", 2)
+    datum_entry        = add_field(window, "Datum:", 3, default=today)
+    uhrzeit_entry      = add_uhrzeit_field(window, 4)
 
     # Kopiere Laptopnummer automatisch in Lagerplatz
     def laptopnummer_changed(event):
         lagerplatz_entry.delete(0, END)
         lagerplatz_entry.insert(0, laptopnummer_entry.get())
-    
+
     laptopnummer_entry.bind("<FocusOut>", laptopnummer_changed)
     laptopnummer_entry.bind("<Return>", laptopnummer_changed)
 
-    datum_label = tk.Label(new_window, text="Datum:")
-    datum_label.grid(row=3, column=0, padx=10, pady=5)
-
-    uhrzeit_label = tk.Label(new_window, text="Uhrzeit:")
-    uhrzeit_label.grid(row=4, column=0, padx=10, pady=5)
-
-    # Setze das aktuelle Datum als Standardwert im Datumseingabefeld
-    today = datetime.today().strftime('%Y-%m-%d')
-    datum_entry = tk.Entry(new_window)
-    datum_entry.insert(0, today)
-    datum_entry.grid(row=3, column=1, padx=10, pady=5)
-
-    def update_uhrzeit():
-        now = datetime.now().strftime("%H:%M:%S")
-        uhrzeit_entry.configure(state='normal')
-        uhrzeit_entry.delete(0, tk.END)
-        uhrzeit_entry.insert(0, now)
-        uhrzeit_entry.configure(state='readonly')
-        new_window.after(1000, update_uhrzeit)
-
-    uhrzeit_entry = tk.Entry(new_window, state='readonly')
-    uhrzeit_entry.grid(row=4, column=1, padx=10, pady=5)
-    update_uhrzeit()
-
     def abgeben_speichern():
-
         laptop_data = get_laptop(laptopnummer_entry.get())
         laptopId = laptop_data[0][0]
         datum = datum_entry.get()
@@ -256,13 +256,7 @@ def open_abgeben():
         lagerplatz_data = get_lagerplatz(lagerplatz_entry.get())
         lagerplatzId = lagerplatz_data[0][0]
 
-        print(lagerplatzId)
-
-        # Hier können die Eingaben weiterverarbeitet oder gespeichert werden
-        messagebox.showinfo("Erfolgreich abgegeben", "Die Daten wurden erfolgreich abgegeben!")
-
-        # Füge die Daten in die Datenbank ein
-        conn = sqlite3.connect('laptopverwaltung1.db')
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''UPDATE ausleihen SET datum_zurueck = ?, uhrzeit_zurueck = ? 
                   WHERE laptopId = ? AND datum_zurueck IS NULL AND uhrzeit_zurueck IS NULL''',
@@ -272,272 +266,120 @@ def open_abgeben():
         conn.commit()
         conn.close()
 
-        # Schließe das Fenster
-        new_window.destroy()
+        messagebox.showinfo("Erfolgreich abgegeben", "Die Daten wurden erfolgreich abgegeben!")
+        window.destroy()
 
-    # Abgeben Button
-    button_abgeben = Button(new_window, text="Abgeben", command=abgeben_speichern)
-    button_abgeben.grid(row=5, column=1, padx=5, pady=5)
+    add_button(window, "Abgeben", abgeben_speichern, 5)
 
-# Öffne das Fenster "Laptop hinzufügen"
-def get_lagerplatz(lagerplatz: int):
-    conn = sqlite3.connect('laptopverwaltung1.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM lagerplatz WHERE lagerplatz= ' + lagerplatz)
-    lagerplatz_data = cursor.fetchall()
-    conn.close()
-    return lagerplatz_data
+
+# ==================== Fenster: Laptop hinzufügen ====================
 
 def open_laptop_hinzufuegen():
-
-    while True:
-        # Überprüfe das Passwort
-        user_password = simpledialog.askstring("Passwort", "Passwort eingeben", show="*")
-        if user_password == password:
-            # Passwort korrekt - Öffne das Fenster
-            # Erstelle ein neues Fenster
-            new_window = tk.Toplevel(root)
-            new_window.title("Laptop hinzufügen") 
-            new_window.configure (bg="blue")
-
-            laptopnummer_label = tk.Label(new_window, text="Laptopnummer:")
-            laptopnummer_label.grid(row=1, column=0, padx=10, pady=5)
-            laptopnummer_entry = tk.Entry(new_window)
-            laptopnummer_entry.grid(row=1, column=1, padx=10, pady=5)
-            laptopnummer_entry.focus_set()
-
-            beschreibung_label = tk.Label(new_window, text="Beschreibung:")
-            beschreibung_label.grid(row=2, column=0, padx=10, pady=5)
-            beschreibung_entry = tk.Entry(new_window)
-            beschreibung_entry.grid(row=2, column=1, padx=10, pady=5)
-
-            lagerplatz_label = tk.Label(new_window, text="Lagerplatz:")
-            lagerplatz_label.grid(row=3, column=0, padx=10, pady=5)
-            lagerplatz_entry = tk.Entry(new_window)
-            lagerplatz_entry.grid(row=3, column=1, padx=10, pady=5)
-
-            def lap_hinzufuegen_speichern():
-                laptopnummer = laptopnummer_entry.get()
-                beschreibung = beschreibung_entry.get()
-                lagerplatz_data = get_lagerplatz(lagerplatz_entry.get())
-                lagerplatzId = lagerplatz_data[0][0]
-
-               # print(lagerplatzId)
-
-                # Hier können die Eingaben weiterverarbeitet oder gespeichert werden
-                messagebox.showinfo("Erfolgreich hinzugefügt", "Der Laptop wurde erfolgreich hinzugefügt!")
-
-                # Füge die Daten in die Datenbank ein
-                conn = sqlite3.connect('laptopverwaltung1.db')
-                cursor = conn.cursor()
-                cursor.execute('''INSERT INTO laptop (laptopnummer, beschreibung)
-                        VALUES (?, ?)''', (laptopnummer, beschreibung))
-                conn.commit()
-
-                laptop_data = get_laptop(laptopnummer_entry.get())
-                laptopId = laptop_data[0][0]
-
-                cursor.execute('''INSERT INTO laptop_lagerplatz (lagerplatzId, laptopId)
-                    VALUES (?, ?)''', (lagerplatzId, laptopId))
-                conn.commit()
-                conn.close()
-
-                # Schließe das Fenster
-                new_window.destroy()
-
-            # Hinzufügen Button
-            button_hinzufuegen = Button(new_window, text="Hinzufügen", command=lap_hinzufuegen_speichern)
-            button_hinzufuegen.grid(row=4, column=1, padx=5, pady=5)
-
-            break  # Beende die Schleife, da das Passwort korrekt ist
-        elif user_password is None:
-            # Der Benutzer hat das Dialogfeld abgebrochen
-            break  # Beende die Schleife, da der Benutzer abgebrochen hat
-        else:
-            # Passwort falsch - Zeige Fehlermeldung an
-            retry = messagebox.askretrycancel("Falsches Passwort", "Das eingegebene Passwort ist nicht korrekt. Erneut versuchen?")
-            if not retry:
-                break  # Beende die Schleife, da der Benutzer keinen erneuten Versuch möchte
-
-# Öffne das Fenster "Lagerplatz hinzufügen"
-def open_lager_hinzufuegen():
-
-    while True:
-        # Überprüfe das Passwort
-        user_password = simpledialog.askstring("Passwort", "Passwort eingeben", show="*")
-        if user_password == password:
-            # Passwort korrekt - Öffne das Fenster
-            # Erstelle ein neues Fenster
-            new_window = tk.Toplevel(root)
-            new_window.title("Lagerplatz hinzufügen") 
-            new_window.configure (bg="blue")
-
-            lagerplatznummer_label = tk.Label(new_window, text="Lagerplatznummer:")
-            lagerplatznummer_label.grid(row=1, column=0, padx=10, pady=5)
-            lagerplatznummer_entry = tk.Entry(new_window)
-            lagerplatznummer_entry.grid(row=1, column=1, padx=10, pady=5)
-            lagerplatznummer_entry.focus_set()
-
-            def lag_hinzufuegen_speichern():
-                lagerplatznummer = lagerplatznummer_entry.get()
-
-                # Hier können die Eingaben weiterverarbeitet oder gespeichert werden
-                messagebox.showinfo("Erfolgreich hinzugefügt", "Der Lagerplatz wurde erfolgreich hinzugefügt!")
-
-                # Füge die Daten in die Datenbank ein
-                conn = sqlite3.connect('laptopverwaltung1.db')
-                cursor = conn.cursor()
-                cursor.execute('''INSERT INTO lagerplatz (lagerplatz)
-                        VALUES (?)''', (lagerplatznummer,)) #Tupel 
-                conn.commit()
-                conn.close()
-
-                # Schließe das Fenster
-                new_window.destroy()
-
-            # Hinzufügen Button
-            button_hinzufuegen = Button(new_window, text="Hinzufügen", command=lag_hinzufuegen_speichern)
-            button_hinzufuegen.grid(row=2, column=1, padx=5, pady=5)
-
-            break  # Beende die Schleife, da das Passwort korrekt ist
-        elif user_password is None:
-            # Der Benutzer hat das Dialogfeld abgebrochen
-            break  # Beende die Schleife, da der Benutzer abgebrochen hat
-        else:
-            # Passwort falsch - Zeige Fehlermeldung an
-            retry = messagebox.askretrycancel("Falsches Passwort", "Das eingegebene Passwort ist nicht korrekt. Erneut versuchen?")
-            if not retry:
-                break  # Beende die Schleife, da der Benutzer keinen erneuten Versuch möchte
-
-# Finde inaktive Azubis (keine Ausleihe seit 2+ Jahren)
-def get_inaktive_azubis():
-    conn = sqlite3.connect('laptopverwaltung1.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT p.id, p.vorname, p.nachname, MAX(a.datum_ausleih) as letzte_ausleihe
-        FROM personen p
-        LEFT JOIN ausleihen a ON p.id = a.personenId
-        GROUP BY p.id
-        HAVING letzte_ausleihe IS NULL 
-           OR letzte_ausleihe < date("now", "-2 years")
-        ORDER BY p.nachname
-    ''')
-    results = cursor.fetchall()
-    conn.close()
-    return results
-
-# Lösche inaktive Azubis
-def loesche_inaktive_azubis(azubi_ids):
-    conn = sqlite3.connect('laptopverwaltung1.db')
-    cursor = conn.cursor()
-    for azubi_id in azubi_ids:
-        cursor.execute('DELETE FROM personen WHERE id = ?', (azubi_id,))
-    conn.commit()
-    conn.close()
-
-# Prüfe und lösche inaktive Azubis automatisch
-def pruefe_inaktive_azubis():
-    inaktive = get_inaktive_azubis()
-    if not inaktive:
+    if not passwort_pruefen():
         return
-    
-    azubi_ids = [a[0] for a in inaktive]
-    loesche_inaktive_azubis(azubi_ids)
-    show_timed_message(root, "Bereinigt", f"{len(inaktive)} inaktive Azubi(s) wurden gelöscht.", 5000, "info")
 
-# Öffne das Fenster "Person hinzufügen"
+    window = create_form_window("Laptop hinzufügen", bg="blue")
+
+    laptopnummer_entry = add_field(window, "Laptopnummer:", 1, focus=True)
+    beschreibung_entry = add_field(window, "Beschreibung:", 2)
+    lagerplatz_entry   = add_field(window, "Lagerplatz:", 3)
+
+    def lap_hinzufuegen_speichern():
+        laptopnummer = laptopnummer_entry.get()
+        beschreibung = beschreibung_entry.get()
+        lagerplatz_data = get_lagerplatz(lagerplatz_entry.get())
+        lagerplatzId = lagerplatz_data[0][0]
+
+        messagebox.showinfo("Erfolgreich hinzugefügt", "Der Laptop wurde erfolgreich hinzugefügt!")
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO laptop (laptopnummer, beschreibung)
+                VALUES (?, ?)''', (laptopnummer, beschreibung))
+        conn.commit()
+
+        laptop_data = get_laptop(laptopnummer_entry.get())
+        laptopId = laptop_data[0][0]
+
+        cursor.execute('''INSERT INTO laptop_lagerplatz (lagerplatzId, laptopId)
+            VALUES (?, ?)''', (lagerplatzId, laptopId))
+        conn.commit()
+        conn.close()
+
+        window.destroy()
+
+    add_button(window, "Hinzufügen", lap_hinzufuegen_speichern, 4)
+
+
+# ==================== Fenster: Lagerplatz hinzufügen ====================
+
+def open_lager_hinzufuegen():
+    if not passwort_pruefen():
+        return
+
+    window = create_form_window("Lagerplatz hinzufügen", bg="blue")
+
+    lagerplatznummer_entry = add_field(window, "Lagerplatznummer:", 1, focus=True)
+
+    def lag_hinzufuegen_speichern():
+        lagerplatznummer = lagerplatznummer_entry.get()
+        messagebox.showinfo("Erfolgreich hinzugefügt", "Der Lagerplatz wurde erfolgreich hinzugefügt!")
+        db_query('INSERT INTO lagerplatz (lagerplatz) VALUES (?)', 
+                 (lagerplatznummer,), fetch=False, commit=True)
+        window.destroy()
+
+    add_button(window, "Hinzufügen", lag_hinzufuegen_speichern, 2)
+
+
+# ==================== Fenster: Person hinzufügen ====================
+
 def open_person_hinzufuegen():
+    window = create_form_window("Person hinzufügen", bg="blue")
 
-    new_window = tk.Toplevel(root)
-    new_window.title("Person hinzufügen") 
-    new_window.configure (bg="blue")
-
-    stammnummer_label = tk.Label(new_window, text="Stammnummer:")
-    stammnummer_label.grid(row=0, column=0, padx=10, pady=5)
-    stammnummer_entry = tk.Entry(new_window)
-    stammnummer_entry.grid(row=0, column=1, padx=10, pady=5)
-    stammnummer_entry.focus_set()
-
-    nachname_label = tk.Label(new_window, text="Nachname:")
-    nachname_label.grid(row=1, column=0, padx=10, pady=5)
-    nachname_entry = tk.Entry(new_window)
-    nachname_entry.grid(row=1, column=1, padx=10, pady=5)
-
-    vorname_label = tk.Label(new_window, text="Vorname:")
-    vorname_label.grid(row=2, column=0, padx=10, pady=5)
-    vorname_entry = tk.Entry(new_window)
-    vorname_entry.grid(row=2, column=1, padx=10, pady=5)
+    stammnummer_entry = add_field(window, "Stammnummer:", 0, focus=True)
+    nachname_entry    = add_field(window, "Nachname:", 1)
+    vorname_entry     = add_field(window, "Vorname:", 2)
 
     def person_hinzufuegen_speichern():
         vorname = vorname_entry.get()
         nachname = nachname_entry.get()
         stammnummer = stammnummer_entry.get()
 
-        # Füge die Daten in die Datenbank ein
-        conn = sqlite3.connect('laptopverwaltung1.db')
-        cursor = conn.cursor()
-        cursor.execute('''INSERT INTO personen (nachname, vorname, stammnummer)
-                VALUES (?, ?, ?)''', (nachname, vorname, stammnummer)) 
-        conn.commit()
-        conn.close()
+        db_query('INSERT INTO personen (nachname, vorname, stammnummer) VALUES (?, ?, ?)',
+                 (nachname, vorname, stammnummer), fetch=False, commit=True)
 
-        # Schließe das Fenster
-        new_window.destroy()
-        
-        # Erfolgsmeldung
+        window.destroy()
         show_timed_message(root, "Erfolgreich", "Die Person wurde erfolgreich hinzugefügt!", 3000, "info")
-        
-        # Prüfe auf inaktive Azubis
         pruefe_inaktive_azubis()
 
-    # Hinzufügen Button
-    button_hinzufuegen = Button(new_window, text="Hinzufügen", command=person_hinzufuegen_speichern)
-    button_hinzufuegen.grid(row=3, column=1, padx=5, pady=5)
-
-def get_laptop_status():
-    conn = sqlite3.connect('laptopverwaltung1.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM laptop_status')
-    laptop_status_data = cursor.fetchall()
-    conn.close()
-    return laptop_status_data
+    add_button(window, "Hinzufügen", person_hinzufuegen_speichern, 3)
 
 
-# Öffne das Fenster "Laptopstatus anzeigen"
+# ==================== Fenster: Bestand anzeigen ====================
+
 def open_laptop_status():
-
-    # Erstelle ein neues Fenster
     new_window = tk.Toplevel(root)
     new_window.title("Bestand")
     new_window.attributes('-zoomed', True)
     laptop_status_data = get_laptop_status()
 
     # Trenne in vorrätige und ausgeliehene Laptops
-    vorrätig = [x for x in laptop_status_data if x[4] is not None]
-    ausgeliehen = [x for x in laptop_status_data if x[4] is None]
-    
-    # Sortiere jeweils nach Beschreibung
-    vorrätig = sorted(vorrätig, key=lambda x: str(x[2] or ''))
-    ausgeliehen = sorted(ausgeliehen, key=lambda x: str(x[2] or ''))
+    vorrätig = sorted([x for x in laptop_status_data if x[4] is not None], key=lambda x: str(x[2] or ''))
+    ausgeliehen = sorted([x for x in laptop_status_data if x[4] is None], key=lambda x: str(x[2] or ''))
 
-    # Erstelle ein Canvas-Widget
+    # Scrollbares Layout
     canvas = tk.Canvas(new_window)
     canvas.pack(fill=tk.BOTH, expand=True)
-
-    # Erstelle ein Frame-Widget im Canvas
     frame = tk.Frame(canvas)
     frame.pack(fill=tk.BOTH, expand=True)
-
-    # Füge den Frame dem Canvas hinzu
     canvas.create_window(0, 0, anchor=tk.NW, window=frame)
 
     # Linke Seite: Vorrätig
     frame_links = tk.Frame(frame)
     frame_links.grid(row=0, column=0, padx=20, pady=10, sticky="nw")
     
-    header_vorrätig = tk.Label(frame_links, text=f"Vorrätig ({len(vorrätig)})", font=("Arial", 18, "bold"), fg="green")
-    header_vorrätig.grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
-    
+    tk.Label(frame_links, text=f"Vorrätig ({len(vorrätig)})", font=("Arial", 18, "bold"), fg="green")\
+        .grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
     tk.Label(frame_links, text="Laptop", font=("Arial", 14, "bold")).grid(row=1, column=0, padx=10, pady=5, sticky="w")
     tk.Label(frame_links, text="Lagerplatz", font=("Arial", 14, "bold")).grid(row=1, column=1, padx=10, pady=5, sticky="w")
     
@@ -550,9 +392,8 @@ def open_laptop_status():
     frame_rechts = tk.Frame(frame)
     frame_rechts.grid(row=0, column=1, padx=20, pady=10, sticky="nw")
     
-    header_ausgeliehen = tk.Label(frame_rechts, text=f"Ausgeliehen ({len(ausgeliehen)})", font=("Arial", 18, "bold"), fg="red")
-    header_ausgeliehen.grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
-    
+    tk.Label(frame_rechts, text=f"Ausgeliehen ({len(ausgeliehen)})", font=("Arial", 18, "bold"), fg="red")\
+        .grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
     tk.Label(frame_rechts, text="Laptop", font=("Arial", 14, "bold")).grid(row=1, column=0, padx=10, pady=5, sticky="w")
     tk.Label(frame_rechts, text="Ausgeliehen an", font=("Arial", 14, "bold")).grid(row=1, column=1, padx=10, pady=5, sticky="w")
     
@@ -561,100 +402,45 @@ def open_laptop_status():
         tk.Label(frame_rechts, text=f"Laptop {beschreibung}", font=("Arial", 14)).grid(row=row, column=0, padx=10, pady=3, sticky="w")
         tk.Label(frame_rechts, text=f"{vorname} {nachname}", font=("Arial", 14)).grid(row=row, column=1, padx=10, pady=3, sticky="w")
 
-    # Füge die Scrollbar zum Canvas hinzu
     scrollbar = tk.Scrollbar(new_window, command=canvas.yview)
     scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
     canvas.configure(yscrollcommand=scrollbar.set)
-
-    # Konfiguriere das Scrollverhalten
     frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
-    
-#Erstelle das Hauptfenster des Programms                        
+
+# ==================== Hauptfenster ====================
+
 root = tk.Tk()
 root.title("Laptopverwaltung")
 
-# Erstelle ein Menü
+# Menü und Buttons aus einer Liste aufbauen
+MENU_ITEMS = [
+    ("Ausleihen",         "Ausleihen",                   open_ausleihen),
+    ("Abgeben",           "Abgeben",                     open_abgeben),
+    ("Neue Person",       "Neue Person hinzufügen",      open_person_hinzufuegen),
+    ("Neuen Laptop",      "Neuen Laptop hinzufügen",     open_laptop_hinzufuegen),
+    ("Neuen Lagerplatz",  "Neuen Lagerplatz hinzufügen", open_lager_hinzufuegen),
+    ("Aktueller Bestand", "Aktueller Bestand",           open_laptop_status),
+]
+
 menu_bar = tk.Menu(root)
 root.config(menu=menu_bar)
 
-# Erstelle ein Menü für "Ausleihen"
-lend_menu = tk.Menu(menu_bar, tearoff=0)
-menu_bar.add_cascade(label="Ausleihen", menu=lend_menu)
+for menu_label, command_label, command in MENU_ITEMS:
+    menu = tk.Menu(menu_bar, tearoff=0)
+    menu_bar.add_cascade(label=menu_label, menu=menu)
+    menu.add_command(label=command_label, command=command)
 
-# Füge eine Option zum "Ausleihen"-Menü hinzu
-lend_menu.add_command(label="Ausleihen", command=open_ausleihen)
-
-# Erstelle ein Menü für "Abgeben"
-lend_menu = tk.Menu(menu_bar, tearoff=0)
-menu_bar.add_cascade(label="Abgeben", menu=lend_menu)
-
-# Füge eine Option zum "Abgeben"-Menü hinzu
-lend_menu.add_command(label="Abgeben", command=open_abgeben)
-
-# Erstelle ein Menü für "Neue Person hinzufügen"
-lend_menu = tk.Menu(menu_bar, tearoff=0)
-menu_bar.add_cascade(label="Neue Person", menu=lend_menu)
-
-# Füge eine Option zum "Neue Person"-Menü hinzu
-lend_menu.add_command(label="Neue Person hinzufügen", command=open_person_hinzufuegen)
-
-# Erstelle ein Menü für "Neuer Laptop hinzufügen"
-lend_menu = tk.Menu(menu_bar, tearoff=0)
-menu_bar.add_cascade(label="Neuen Laptop", menu=lend_menu)
-
-# Füge eine Option zum "Neuen Laptop"-Menü hinzu
-lend_menu.add_command(label="Neuen Laptop hinzufügen", command=open_laptop_hinzufuegen)
-
-# Erstelle ein Menü für "Neuen Lagerplatz hinzufügen"
-lend_menu = tk.Menu(menu_bar, tearoff=0)
-menu_bar.add_cascade(label="Neuen Lagerplatz", menu=lend_menu)
-
-# Füge eine Option zum "Neuen Lagerplatz"-Menü hinzu
-lend_menu.add_command(label="Neuen Lagerplatz hinzufügen", command=open_lager_hinzufuegen)
-
-# Erstelle ein Menü für "Aktueller Bestand"
-lend_menu = tk.Menu(menu_bar, tearoff=0)
-menu_bar.add_cascade(label="Aktueller Bestand", menu=lend_menu)
-
-# Füge eine Option zum "Aktueller Bestand"-Menü hinzu
-lend_menu.add_command(label="Aktueller Bestand", command=open_laptop_status)
-
-# Erstelle ein Label mit dem Titel der Anwendung
 title_label = tk.Label(root, text="Laptopverwaltung", font=("Arial", 24))
 title_label.pack(pady=20)
 
-# Erstelle ein Frame-Widget für die Optionen
 options_frame = tk.Frame(root)
 options_frame.pack()
 
-# Erstelle ein Label mit einer Beschreibung der verfügbaren Optionen
 options_label = tk.Label(options_frame, text="Wähle eine Option aus dem Menü aus:", font=("Arial", 14))
 options_label.pack(pady=10)
 
-# Erstelle den "Ausleihen"-Button
-lend_button = tk.Button(options_frame, text="Ausleihen", font=("Arial", 18), command=open_ausleihen)
-lend_button.pack(pady=5)
+for _, button_text, command in MENU_ITEMS:
+    tk.Button(options_frame, text=button_text, font=("Arial", 18), command=command).pack(pady=5)
 
-# Erstelle den "Abgeben"-Button
-lend_button = tk.Button(options_frame, text="Abgeben", font=("Arial", 18), command=open_abgeben)
-lend_button.pack(pady=5)
-
-# Erstelle den "Neue Person hinzufügen"-Button
-lend_button = tk.Button(options_frame, text="Neue Person hinzufügen", font=("Arial", 18), command=open_person_hinzufuegen)
-lend_button.pack(pady=5)
-
-# Erstelle den "Neuen Laptop hinzufügen"-Button
-lend_button = tk.Button(options_frame, text="Neuen Laptop hinzufügen", font=("Arial", 18), command=open_laptop_hinzufuegen)
-lend_button.pack(pady=5)
-
-# Erstelle den "Neuen Lagerplatz hinzufügen"-Button
-lend_button = tk.Button(options_frame, text="Neuen Lagerplatz hinzufügen", font=("Arial", 18), command=open_lager_hinzufuegen)
-lend_button.pack(pady=5)
-
-# Erstelle den "Bestand"-Button
-lend_button = tk.Button(options_frame, text="Aktueller Bestand", font=("Arial", 18), command=open_laptop_status)
-lend_button.pack(pady=5)
-
-#Hauptfenster bleibt geöffnet und reagiert auf Events
 root.mainloop()
