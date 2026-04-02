@@ -192,6 +192,11 @@ def show_timed_message(parent, title, message, timeout=10000, msg_type="info"):
     popup.configure(bg=COLORS["bg"])
     popup.resizable(False, False)
 
+    # Immer im Vordergrund anzeigen
+    popup.attributes('-topmost', True)
+    popup.lift()
+    popup.focus_force()
+
     type_colors = {
         "info":    (COLORS["success_bg"], COLORS["success_fg"]),
         "error":   (COLORS["error_bg"],   COLORS["error_fg"]),
@@ -208,7 +213,14 @@ def show_timed_message(parent, title, message, timeout=10000, msg_type="info"):
     ok_btn = ttk.Button(frame, text="OK", command=popup.destroy, style="Form.TButton")
     ok_btn.pack()
 
-    popup.after(timeout, popup.destroy)
+    def safe_destroy():
+        try:
+            if popup.winfo_exists():
+                popup.destroy()
+        except:
+            pass
+
+    popup.after(timeout, safe_destroy)
 
 
 def db_query(sql, params=(), fetch=True, commit=False):
@@ -628,9 +640,9 @@ def open_person_hinzufuegen():
         db_query('INSERT INTO personen (nachname, vorname, stammnummer) VALUES (?, ?, ?)',
                  (nachname, vorname, stammnummer), fetch=False, commit=True)
 
-        window.destroy()
         show_timed_message(root, "Erfolgreich",
                            "Die Person wurde erfolgreich hinzugefuegt!", 3000, "info")
+        window.destroy()
         pruefe_inaktive_azubis()
 
     add_button(window, "Hinzufuegen", person_hinzufuegen_speichern, 3)
