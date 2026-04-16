@@ -186,11 +186,23 @@ def setup_styles():
 # ==================== Helper-Funktionen ====================
 
 def show_timed_message(parent, title, message, timeout=10000, msg_type="info"):
-    """Zeigt eine Meldung die sich nach timeout (ms) automatisch schliesst"""
+    """Zeigt eine Meldung die sich nach timeout (ms) automatisch schliesst.
+    Popup ist zentriert auf dem Bildschirm und deutlich groesser als Standard."""
     popup = tk.Toplevel(parent)
     popup.title(title)
     popup.configure(bg=COLORS["bg"])
     popup.resizable(False, False)
+
+    # Feste Groesse + auf dem Bildschirm zentrieren
+    popup_width  = 600
+    popup_height = 240
+    # update_idletasks() damit winfo_screenwidth korrekte Werte liefert
+    popup.update_idletasks()
+    screen_w = popup.winfo_screenwidth()
+    screen_h = popup.winfo_screenheight()
+    x = (screen_w - popup_width) // 2
+    y = (screen_h - popup_height) // 2
+    popup.geometry(f"{popup_width}x{popup_height}+{x}+{y}")
 
     # Immer im Vordergrund anzeigen (auch gegen Fullscreen-Parent)
     popup.attributes('-topmost', True)
@@ -208,11 +220,13 @@ def show_timed_message(parent, title, message, timeout=10000, msg_type="info"):
     }
     bg_color, fg_color = type_colors.get(msg_type, (COLORS["bg_card"], COLORS["text"]))
 
-    frame = tk.Frame(popup, bg=bg_color, padx=24, pady=16)
-    frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+    frame = tk.Frame(popup, bg=bg_color, padx=32, pady=24)
+    frame.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
 
-    tk.Label(frame, text=message, font=FONT, bg=bg_color, fg=fg_color,
-             wraplength=350).pack(pady=(0, 12))
+    # Groessere Schrift fuer bessere Lesbarkeit aus der Ferne
+    msg_font = ("Segoe UI", 16)
+    tk.Label(frame, text=message, font=msg_font, bg=bg_color, fg=fg_color,
+             wraplength=500, justify="center").pack(pady=(8, 20), expand=True)
 
     ok_btn = ttk.Button(frame, text="OK", command=popup.destroy, style="Form.TButton")
     ok_btn.pack()
@@ -240,7 +254,7 @@ def db_query(sql, params=(), fetch=True, commit=False):
 
 
 def create_form_window(title):
-    """Erstellt ein neues Toplevel-Fenster im Dark Theme."""
+    """Erstellt ein neues Toplevel-Fenster im Dark Theme. Zentriert auf dem Bildschirm."""
     window = tk.Toplevel(root)
     window.title(title)
     window.configure(bg=COLORS["bg"])
@@ -265,6 +279,26 @@ def create_form_window(title):
     # Titel
     ttk.Label(window, text=title, style="Heading.TLabel").grid(
         row=2, column=0, columnspan=2, pady=(20, 16), padx=24)
+
+    # Fenster auf dem Bildschirm zentrieren - nach dem Layout aller Widgets
+    def center_window():
+        window.update_idletasks()
+        w = window.winfo_width()
+        h = window.winfo_height()
+        # Mindestbreite fuer mehr Luft in den Formularen
+        if w < 500:
+            w = 500
+            window.geometry(f"{w}x{h}")
+            window.update_idletasks()
+            h = window.winfo_height()
+        screen_w = window.winfo_screenwidth()
+        screen_h = window.winfo_screenheight()
+        x = (screen_w - w) // 2
+        y = (screen_h - h) // 2
+        window.geometry(f"{w}x{h}+{x}+{y}")
+
+    # after_idle: wird ausgefuehrt, wenn alle Widgets (Felder, Buttons) gelayoutet sind
+    window.after_idle(center_window)
 
     return window
 
@@ -318,6 +352,55 @@ def add_button(window, text, command, row, style="Form.TButton"):
     return btn
 
 
+def make_scan_only(entry, max_gap_ms=50):
+    """Macht ein Entry-Feld zu einem Nur-Scan-Feld.
+
+    Ein Barcode-Scanner 'tippt' Zeichen in unter 30ms Abstand, ein Mensch
+    braucht >100ms pro Taste. Wir akzeptieren nur Eingaben, bei denen
+    aufeinanderfolgende Zeichen weniger als max_gap_ms auseinanderliegen.
+    Paste wird komplett blockiert.
+    """
+    state = {"last_time": 0, "scanning": False}
+
+    def on_key(event):
+        # Steuertasten (Tab, Enter, Backspace zum Loeschen, Pfeile etc.) erlauben
+        if event.keysym in ("Tab", "Return", "BackSpace", "Delete",
+                            "Left", "Right", "Home", "End"):
+            return None
+
+        # Nur druckbare Zeichen pruefen
+        if not event.char or not event.char.isprintable():
+            return None
+
+        now = int(time.time() * 1000)
+        gap = now - state["last_time"]
+
+        if state["last_time"] == 0:
+            # Erstes Zeichen - Timer starten, zulassen
+            state["last_time"] = now
+            state["scanning"] = True
+            # Nach max_gap_ms * 3 ohne weiteres Zeichen -> Feld wurde "fertig gescannt"
+            entry.after(max_gap_ms * 3, lambda: state.update({"last_time": 0, "scanning": False}))
+            return None
+
+        if gap > max_gap_ms:
+            # Zu langsam - das ist eine Tastatureingabe, blockieren
+            return "break"
+
+        state["last_time"] = now
+        return None
+
+    def on_paste(event):
+        # Paste komplett blockieren
+        return "break"
+
+    entry.bind("<KeyPress>", on_key)
+    entry.bind("<<Paste>>", on_paste)
+    entry.bind("<Control-v>", on_paste)
+    entry.bind("<Control-V>", on_paste)
+    entry.bind("<Button-3>", lambda e: "break")  # Rechtsklick-Menue blockieren
+
+
 def passwort_pruefen():
     """Prueft das Passwort in einer Schleife. Gibt True zurueck wenn korrekt, False bei Abbruch."""
     while True:
@@ -346,6 +429,18 @@ def get_lagerplatz(lagerplatz):
 
 def get_laptop_status():
     return db_query('SELECT * FROM laptop_status')
+
+
+def get_ladekabel_fuer_laptop(laptopId):
+    """Gibt das Ladekabel zurueck, das einem Laptop zugeordnet ist, oder None."""
+    result = db_query('SELECT * FROM ladekabel WHERE laptopId = ?', (laptopId,))
+    return result[0] if result else None
+
+def get_ladekabel_by_nummer(ladekabelnummer):
+    """Gibt das Ladekabel anhand seiner Nummer zurueck, oder None."""
+    result = db_query('SELECT * FROM ladekabel WHERE ladekabelnummer = ?',
+                      (ladekabelnummer,))
+    return result[0] if result else None
 
 
 # ==================== Inaktive Azubis ====================
@@ -389,8 +484,10 @@ def open_ausleihen():
     nachname_entry     = add_field(window, "Nachname:", 1)
     vorname_entry      = add_field(window, "Vorname:", 2)
     laptopnummer_entry = add_field(window, "Laptopnummer:", 3)
-    datum_entry        = add_field(window, "Datum:", 4, default=today)
-    uhrzeit_entry      = add_uhrzeit_field(window, 5)
+    ladekabel_entry    = add_field(window, "Ladekabel (scannen):", 4)
+    make_scan_only(ladekabel_entry)
+    datum_entry        = add_field(window, "Datum:", 5, default=today)
+    uhrzeit_entry      = add_uhrzeit_field(window, 6)
 
     def stammnummer_focusout(event):
         stnr = stammnummer_entry.get().strip()
@@ -447,6 +544,27 @@ def open_ausleihen():
                                "Dieser Laptop ist bereits ausgeliehen!", 5000, "error")
             return
 
+        # Ladekabel pruefen
+        erwartetes_ladekabel = get_ladekabel_fuer_laptop(laptopId)
+        if erwartetes_ladekabel is not None:
+            # Laptop hat ein Ladekabel hinterlegt -> Scan ist Pflicht
+            eingegebenes_ladekabel = ladekabel_entry.get().strip()
+            if not eingegebenes_ladekabel:
+                show_timed_message(window, "Fehler",
+                                   "Bitte Ladekabel scannen!", 5000, "error")
+                return
+            # Nummer muss mit der hinterlegten Ladekabelnummer uebereinstimmen
+            if str(erwartetes_ladekabel[1]) != eingegebenes_ladekabel:
+                show_timed_message(window, "Fehler",
+                                   f"Falsches Ladekabel! Erwartet: {erwartetes_ladekabel[1]}",
+                                   5000, "error")
+                return
+        else:
+            # Altbestand: Laptop hat (noch) kein Ladekabel im System -> Warnung, aber durchlassen
+            show_timed_message(window, "Hinweis",
+                               f"Fuer Laptop {lnr} ist kein Ladekabel hinterlegt (Altbestand).",
+                               4000, "warning")
+
         datum = datum_entry.get()
         uhrzeit = datetime.now().strftime("%H:%M:%S")
 
@@ -462,7 +580,7 @@ def open_ausleihen():
         show_timed_message(root, "Erfolgreich",
                            "Die Daten wurden erfolgreich gespeichert!", 10000, "info")
 
-    add_button(window, "Senden", ausleihen_speichern, 6)
+    add_button(window, "Senden", ausleihen_speichern, 7)
 
 
 # ==================== Fenster: Abgeben ====================
@@ -472,9 +590,11 @@ def open_abgeben():
     today = datetime.today().strftime('%Y-%m-%d')
 
     laptopnummer_entry = add_field(window, "Laptopnummer:", 1, focus=True)
-    lagerplatz_entry   = add_field(window, "Lagerplatz:", 2)
-    datum_entry        = add_field(window, "Datum:", 3, default=today)
-    uhrzeit_entry      = add_uhrzeit_field(window, 4)
+    ladekabel_entry    = add_field(window, "Ladekabel (scannen):", 2)
+    make_scan_only(ladekabel_entry)
+    lagerplatz_entry   = add_field(window, "Lagerplatz:", 3)
+    datum_entry        = add_field(window, "Datum:", 4, default=today)
+    uhrzeit_entry      = add_uhrzeit_field(window, 5)
 
     # Kopiere Laptopnummer automatisch in Lagerplatz
     def laptopnummer_changed(event):
@@ -507,6 +627,24 @@ def open_abgeben():
                                f"Laptop {lnr} ist nicht ausgeliehen!", 5000, "error")
             return
 
+        # Ladekabel pruefen (selbe Logik wie beim Ausleihen)
+        erwartetes_ladekabel = get_ladekabel_fuer_laptop(laptopId)
+        if erwartetes_ladekabel is not None:
+            eingegebenes_ladekabel = ladekabel_entry.get().strip()
+            if not eingegebenes_ladekabel:
+                show_timed_message(window, "Fehler",
+                                   "Bitte Ladekabel scannen!", 5000, "error")
+                return
+            if str(erwartetes_ladekabel[1]) != eingegebenes_ladekabel:
+                show_timed_message(window, "Fehler",
+                                   f"Falsches Ladekabel! Erwartet: {erwartetes_ladekabel[1]}",
+                                   5000, "error")
+                return
+        else:
+            show_timed_message(window, "Hinweis",
+                               f"Fuer Laptop {lnr} ist kein Ladekabel hinterlegt (Altbestand).",
+                               4000, "warning")
+
         # Lagerplatz pruefen
         lp = lagerplatz_entry.get().strip()
         if not lp:
@@ -537,7 +675,7 @@ def open_abgeben():
         show_timed_message(root, "Erfolgreich",
                            "Die Daten wurden erfolgreich abgegeben!", 5000, "info")
 
-    add_button(window, "Abgeben", abgeben_speichern, 5)
+    add_button(window, "Abgeben", abgeben_speichern, 6)
 
 
 # ==================== Fenster: Laptop hinzufuegen ====================
@@ -577,6 +715,71 @@ def open_laptop_hinzufuegen():
         window.destroy()
 
     add_button(window, "Hinzufuegen", lap_hinzufuegen_speichern, 4)
+
+
+# ==================== Fenster: Ladekabel hinzufuegen ====================
+
+def open_ladekabel_hinzufuegen():
+    if not passwort_pruefen():
+        return
+
+    window = create_form_window("Ladekabel hinzufuegen")
+
+    laptopnummer_entry = add_field(window, "Laptopnummer:", 1, focus=True)
+    ladekabel_entry    = add_field(window, "Ladekabel (scannen):", 2)
+    make_scan_only(ladekabel_entry)
+
+    def lade_hinzufuegen_speichern():
+        # Laptop pruefen
+        lnr = laptopnummer_entry.get().strip()
+        if not lnr:
+            show_timed_message(window, "Fehler",
+                               "Bitte Laptopnummer eingeben!", 5000, "error")
+            return
+        laptop_data = get_laptop(lnr)
+        if not laptop_data:
+            show_timed_message(window, "Fehler",
+                               f"Kein Laptop mit Nummer {lnr} gefunden!", 5000, "error")
+            return
+        laptopId = laptop_data[0][0]
+
+        # Pruefen ob Laptop schon ein Ladekabel hat
+        if get_ladekabel_fuer_laptop(laptopId) is not None:
+            show_timed_message(window, "Fehler",
+                               f"Laptop {lnr} hat bereits ein Ladekabel zugeordnet!",
+                               5000, "error")
+            return
+
+        # Ladekabel-Eingabe pruefen (muss gescannt sein)
+        ladekabelnummer = ladekabel_entry.get().strip()
+        if not ladekabelnummer:
+            show_timed_message(window, "Fehler",
+                               "Bitte Ladekabel scannen!", 5000, "error")
+            return
+
+        # Nummer muss identisch zur Laptopnummer sein
+        if ladekabelnummer != lnr:
+            show_timed_message(window, "Fehler",
+                               f"Ladekabelnummer ({ladekabelnummer}) stimmt nicht "
+                               f"mit Laptopnummer ({lnr}) ueberein!",
+                               6000, "error")
+            return
+
+        # Pruefen ob Ladekabelnummer schon anderswo vergeben ist
+        if get_ladekabel_by_nummer(ladekabelnummer) is not None:
+            show_timed_message(window, "Fehler",
+                               f"Ladekabel {ladekabelnummer} ist bereits im System!",
+                               5000, "error")
+            return
+
+        db_query('INSERT INTO ladekabel (ladekabelnummer, laptopId) VALUES (?, ?)',
+                 (ladekabelnummer, laptopId), fetch=False, commit=True)
+
+        window.destroy()
+        show_timed_message(root, "Erfolgreich",
+                           "Das Ladekabel wurde erfolgreich hinzugefuegt!", 3000, "info")
+
+    add_button(window, "Hinzufuegen", lade_hinzufuegen_speichern, 3)
 
 
 # ==================== Fenster: Lagerplatz hinzufuegen ====================
@@ -858,6 +1061,7 @@ MENU_ITEMS = [
     ("Abgeben",           _wrap_singleton("Abgeben", open_abgeben),                "MainButton.TButton"),
     ("Neue Person",       _wrap_singleton("Person hinzufuegen", open_person_hinzufuegen),  "MainButton.TButton"),
     ("Neuer Laptop",      _wrap_singleton("Laptop hinzufuegen", open_laptop_hinzufuegen),  "MainButton.TButton"),
+    ("Neues Ladekabel",   _wrap_singleton("Ladekabel hinzufuegen", open_ladekabel_hinzufuegen), "MainButton.TButton"),
     ("Neuer Lagerplatz",  _wrap_singleton("Lagerplatz hinzufuegen", open_lager_hinzufuegen), "MainButton.TButton"),
     ("Aktueller Bestand", _wrap_singleton("Bestand", open_laptop_status),          "MainButton.TButton"),
 ]
@@ -870,6 +1074,7 @@ btn_frame.columnconfigure(1, weight=1)
 btn_frame.rowconfigure(0, weight=1)
 btn_frame.rowconfigure(1, weight=1)
 btn_frame.rowconfigure(2, weight=1)
+btn_frame.rowconfigure(3, weight=1)
 
 for i, (text, command, style) in enumerate(MENU_ITEMS):
     row = i // 2
