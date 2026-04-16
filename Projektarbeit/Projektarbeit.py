@@ -192,10 +192,14 @@ def show_timed_message(parent, title, message, timeout=10000, msg_type="info"):
     popup.configure(bg=COLORS["bg"])
     popup.resizable(False, False)
 
-    # Immer im Vordergrund anzeigen
+    # Immer im Vordergrund anzeigen (auch gegen Fullscreen-Parent)
     popup.attributes('-topmost', True)
+    popup.transient(parent)
     popup.lift()
     popup.focus_force()
+    # Nach kurzer Verzoegerung nochmal nach oben ziehen - manche
+    # Window-Manager (v.a. auf dem Pi) ueberschreiben sonst das topmost-Flag
+    popup.after(50, lambda: (popup.lift(), popup.focus_force()))
 
     type_colors = {
         "info":    (COLORS["success_bg"], COLORS["success_fg"]),
@@ -454,9 +458,9 @@ def open_ausleihen():
         conn.commit()
         conn.close()
 
+        window.destroy()
         show_timed_message(root, "Erfolgreich",
                            "Die Daten wurden erfolgreich gespeichert!", 10000, "info")
-        window.destroy()
 
     add_button(window, "Senden", ausleihen_speichern, 6)
 
@@ -529,9 +533,9 @@ def open_abgeben():
         conn.commit()
         conn.close()
 
+        window.destroy()
         show_timed_message(root, "Erfolgreich",
                            "Die Daten wurden erfolgreich abgegeben!", 5000, "info")
-        window.destroy()
 
     add_button(window, "Abgeben", abgeben_speichern, 5)
 
@@ -761,6 +765,12 @@ def open_laptop_status():
     scroll_right = ttk.Scrollbar(right_frame, orient="vertical", command=tree_right.yview)
     scroll_right.grid(row=1, column=1, sticky="ns")
     tree_right.configure(yscrollcommand=scroll_right.set)
+
+    # Schliessen-Button unten - gross und deutlich sichtbar
+    btn_frame = ttk.Frame(new_window)
+    btn_frame.pack(fill=tk.X, padx=24, pady=(0, 24))
+    ttk.Button(btn_frame, text="Schliessen", command=new_window.destroy,
+               style="Form.TButton").pack(side=tk.RIGHT)
 
 
 # ==================== Hauptfenster ====================
