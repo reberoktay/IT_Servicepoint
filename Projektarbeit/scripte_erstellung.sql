@@ -37,6 +37,13 @@ FOREIGN KEY(personenId) REFERENCES personen(id),
 FOREIGN KEY(laptopId) REFERENCES laptop(id)
 );
 
+CREATE TABLE ladekabel (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ladekabelnummer INT UNIQUE NOT NULL,
+    laptopId INT UNIQUE NOT NULL,
+    FOREIGN KEY(laptopId) REFERENCES laptop(id)
+);
+
 CREATE VIEW laptop_status
 AS 
    SELECT lap.id as laptopId
