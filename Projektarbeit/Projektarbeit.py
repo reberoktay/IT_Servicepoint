@@ -778,28 +778,64 @@ def open_laptop_hinzufuegen():
     lagerplatz_entry   = add_field(window, "Lagerplatz:", 3)
 
     def lap_hinzufuegen_speichern():
-        laptopnummer = laptopnummer_entry.get()
-        beschreibung = beschreibung_entry.get()
-        lagerplatz_data = get_lagerplatz(lagerplatz_entry.get())
+        laptopnummer = laptopnummer_entry.get().strip()
+        beschreibung = beschreibung_entry.get().strip()
+        lagerplatz = lagerplatz_entry.get().strip()
+
+        # Eingaben pruefen
+        if not laptopnummer:
+            show_timed_message(window, "Fehler",
+                               "Bitte Laptopnummer eingeben!", 5000, "error")
+            return
+        if not lagerplatz:
+            show_timed_message(window, "Fehler",
+                               "Bitte Lagerplatz eingeben!", 5000, "error")
+            return
+
+        # Duplikat-Check: Laptopnummer schon vergeben?
+        if get_laptop(laptopnummer):
+            show_timed_message(window, "Fehler",
+                               f"Laptop {laptopnummer} ist bereits im System!",
+                               5000, "error")
+            return
+
+        # Lagerplatz muss existieren
+        lagerplatz_data = get_lagerplatz(lagerplatz)
+        if not lagerplatz_data:
+            show_timed_message(window, "Fehler",
+                               f"Lagerplatz {lagerplatz} existiert nicht!",
+                               5000, "error")
+            return
         lagerplatzId = lagerplatz_data[0][0]
 
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''INSERT INTO laptop (laptopnummer, beschreibung)
-                VALUES (?, ?)''', (laptopnummer, beschreibung))
-        conn.commit()
+        # Pruefen ob Lagerplatz schon belegt ist (laptop_lagerplatz ist 1:1)
+        belegt = db_query('SELECT * FROM laptop_lagerplatz WHERE lagerplatzId = ?',
+                          (lagerplatzId,))
+        if belegt:
+            show_timed_message(window, "Fehler",
+                               f"Lagerplatz {lagerplatz} ist bereits belegt!",
+                               5000, "error")
+            return
 
-        laptop_data = get_laptop(laptopnummer_entry.get())
-        laptopId = laptop_data[0][0]
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute('''INSERT INTO laptop (laptopnummer, beschreibung)
+                    VALUES (?, ?)''', (laptopnummer, beschreibung))
+            laptopId = cursor.lastrowid
+            cursor.execute('''INSERT INTO laptop_lagerplatz (lagerplatzId, laptopId)
+                VALUES (?, ?)''', (lagerplatzId, laptopId))
+            conn.commit()
+            conn.close()
+        except sqlite3.IntegrityError as e:
+            show_timed_message(window, "Fehler",
+                               f"Daten konnten nicht gespeichert werden: {e}",
+                               5000, "error")
+            return
 
-        cursor.execute('''INSERT INTO laptop_lagerplatz (lagerplatzId, laptopId)
-            VALUES (?, ?)''', (lagerplatzId, laptopId))
-        conn.commit()
-        conn.close()
-
+        window.destroy()
         show_timed_message(root, "Erfolgreich",
                            "Der Laptop wurde erfolgreich hinzugefuegt!", 3000, "info")
-        window.destroy()
 
     add_button(window, "Hinzufuegen", lap_hinzufuegen_speichern, 4)
 
@@ -872,13 +908,32 @@ def open_lager_hinzufuegen():
     lagerplatznummer_entry = add_field(window, "Lagerplatznummer:", 1, focus=True)
 
     def lag_hinzufuegen_speichern():
-        lagerplatznummer = lagerplatznummer_entry.get()
-        db_query('INSERT INTO lagerplatz (lagerplatz) VALUES (?)',
-                 (lagerplatznummer,), fetch=False, commit=True)
+        lagerplatznummer = lagerplatznummer_entry.get().strip()
 
+        if not lagerplatznummer:
+            show_timed_message(window, "Fehler",
+                               "Bitte Lagerplatznummer eingeben!", 5000, "error")
+            return
+
+        # Duplikat-Check
+        if get_lagerplatz(lagerplatznummer):
+            show_timed_message(window, "Fehler",
+                               f"Lagerplatz {lagerplatznummer} ist bereits im System!",
+                               5000, "error")
+            return
+
+        try:
+            db_query('INSERT INTO lagerplatz (lagerplatz) VALUES (?)',
+                     (lagerplatznummer,), fetch=False, commit=True)
+        except sqlite3.IntegrityError as e:
+            show_timed_message(window, "Fehler",
+                               f"Daten konnten nicht gespeichert werden: {e}",
+                               5000, "error")
+            return
+
+        window.destroy()
         show_timed_message(root, "Erfolgreich",
                            "Der Lagerplatz wurde erfolgreich hinzugefuegt!", 3000, "info")
-        window.destroy()
 
     add_button(window, "Hinzufuegen", lag_hinzufuegen_speichern, 2)
 
