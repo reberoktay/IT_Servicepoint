@@ -44,11 +44,13 @@ AS
    , lap.beschreibung
    , laplag.lagerplatzId
    , lag.lagerplatz
+   , pers.vorname
+   , pers.nachname
    FROM laptop lap
    LEFT JOIN laptop_lagerplatz laplag ON lap.id = laplag.laptopId
    LEFT JOIN lagerplatz lag ON laplag.lagerplatzId = lag.id
+   LEFT JOIN (SELECT * FROM ausleihen WHERE datum_zurueck IS NULL) ausl ON lap.id = ausl.laptopId
+   LEFT JOIN personen pers ON ausl.personenId = pers.id
 ;
 
 SELECT name, sql FROM sqlite_master WHERE type='table' OR type='view';
-
-2
