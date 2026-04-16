@@ -135,25 +135,25 @@ def setup_styles():
               foreground=[("active", "white")])
 
     # Akzent-Buttons fuer die Haupt-Aktionen der Azubis: Ausleihen (gruen) und Abgeben (blau)
-    # lightcolor/darkcolor/bordercolor zusammen: einfarbiger Rand im clam-Theme
-    style.configure("MainGreen.TButton", background=COLORS["bg_card"],
-                    foreground=COLORS["green_text"], font=FONT_BTN_MAIN, padding=(24, 28),
-                    borderwidth=3, relief="solid",
-                    bordercolor=COLORS["accent_green"],
+    # Permanent gefuellt, Hover wird minimal heller
+    style.configure("MainGreen.TButton", background=COLORS["accent_green"],
+                    foreground="white", font=FONT_BTN_MAIN, padding=(24, 28),
+                    borderwidth=0, relief="flat",
                     lightcolor=COLORS["accent_green"],
-                    darkcolor=COLORS["accent_green"])
+                    darkcolor=COLORS["accent_green"],
+                    bordercolor=COLORS["accent_green"])
     style.map("MainGreen.TButton",
-              background=[("active", COLORS["accent_green"])],
+              background=[("active", "#22c55e"), ("pressed", "#15803d")],
               foreground=[("active", "white")])
 
-    style.configure("MainBlue.TButton", background=COLORS["bg_card"],
-                    foreground="#60a5fa", font=FONT_BTN_MAIN, padding=(24, 28),
-                    borderwidth=3, relief="solid",
-                    bordercolor=COLORS["accent_blue"],
+    style.configure("MainBlue.TButton", background=COLORS["accent_blue"],
+                    foreground="white", font=FONT_BTN_MAIN, padding=(24, 28),
+                    borderwidth=0, relief="flat",
                     lightcolor=COLORS["accent_blue"],
-                    darkcolor=COLORS["accent_blue"])
+                    darkcolor=COLORS["accent_blue"],
+                    bordercolor=COLORS["accent_blue"])
     style.map("MainBlue.TButton",
-              background=[("active", COLORS["accent_blue"])],
+              background=[("active", "#3b82f6"), ("pressed", "#1e40af")],
               foreground=[("active", "white")])
 
     style.configure("Form.TButton", background=COLORS["accent_blue"],
@@ -305,22 +305,20 @@ def create_form_window(title):
     # Fenster auf dem Bildschirm zentrieren - nach dem Layout aller Widgets
     def center_window():
         window.update_idletasks()
-        w = window.winfo_width()
-        h = window.winfo_height()
+        w = window.winfo_reqwidth()   # reqwidth = was die Widgets wirklich brauchen
+        h = window.winfo_reqheight()
         # Mindestbreite fuer mehr Luft in den Formularen
         if w < 500:
             w = 500
-            window.geometry(f"{w}x{h}")
-            window.update_idletasks()
-            h = window.winfo_height()
         screen_w = window.winfo_screenwidth()
         screen_h = window.winfo_screenheight()
         x = (screen_w - w) // 2
         y = (screen_h - h) // 2
         window.geometry(f"{w}x{h}+{x}+{y}")
 
-    # after_idle: wird ausgefuehrt, wenn alle Widgets (Felder, Buttons) gelayoutet sind
-    window.after_idle(center_window)
+    # Deutlich warten, damit alle Felder und Buttons vom Aufrufer schon da sind.
+    # after_idle war zu frueh und hat das Fenster auf die Topbar-Hoehe fixiert.
+    window.after(100, center_window)
 
     return window
 
@@ -1144,17 +1142,14 @@ sep.pack(fill=tk.X)
 
 # Content zentriert (expand fuer vertikale Zentrierung)
 content_frame = ttk.Frame(root)
-content_frame.pack(expand=True, fill=tk.BOTH, padx=40, pady=(20, 40))
-
-# Titel zentriert
-ttk.Label(content_frame, text="Laptopverwaltung", style="Title.TLabel").pack(pady=(20, 24))
+content_frame.pack(expand=True, fill=tk.BOTH, padx=80, pady=40)
 
 
 # ============================================================
 # GRUPPE 1: Azubi-Funktionen (Ausleihen, Abgeben, Neue Person)
 # ============================================================
 azubi_frame = ttk.Frame(content_frame)
-azubi_frame.pack(fill=tk.BOTH, expand=True, padx=48, pady=(0, 12))
+azubi_frame.pack(fill=tk.BOTH, expand=True)
 azubi_frame.columnconfigure(0, weight=1)
 azubi_frame.columnconfigure(1, weight=1)
 azubi_frame.rowconfigure(0, weight=1)
@@ -1162,25 +1157,25 @@ azubi_frame.rowconfigure(1, weight=1)
 
 ttk.Button(azubi_frame, text="Ausleihen",
            command=_wrap_singleton("Ausleihen", open_ausleihen),
-           style="MainGreen.TButton").grid(row=0, column=0, padx=8, pady=8, sticky="nsew")
+           style="MainGreen.TButton").grid(row=0, column=0, padx=(0, 10), pady=(0, 10), sticky="nsew")
 ttk.Button(azubi_frame, text="Abgeben",
            command=_wrap_singleton("Abgeben", open_abgeben),
-           style="MainBlue.TButton").grid(row=0, column=1, padx=8, pady=8, sticky="nsew")
+           style="MainBlue.TButton").grid(row=0, column=1, padx=(10, 0), pady=(0, 10), sticky="nsew")
 # Neue Person: volle Breite (ueber beide Spalten)
 ttk.Button(azubi_frame, text="Neue Person",
            command=_wrap_singleton("Person hinzufuegen", open_person_hinzufuegen),
            style="MainButton.TButton").grid(row=1, column=0, columnspan=2,
-                                            padx=8, pady=8, sticky="nsew")
+                                            padx=0, pady=(10, 0), sticky="nsew")
 
-# Visueller Trenner zwischen Azubi- und Admin-Bereich
-separator = tk.Frame(content_frame, bg=COLORS["border"], height=2)
-separator.pack(fill=tk.X, padx=80, pady=16)
+# Visueller Trenner zwischen Azubi- und Admin-Bereich - subtil, viel Luft drumherum
+separator = tk.Frame(content_frame, bg=COLORS["border"], height=1)
+separator.pack(fill=tk.X, padx=120, pady=32)
 
 # ============================================================
 # GRUPPE 2: Admin-Funktionen (Laptop, Ladekabel, Lagerplatz, Bestand)
 # ============================================================
 admin_frame = ttk.Frame(content_frame)
-admin_frame.pack(fill=tk.BOTH, expand=True, padx=48, pady=(12, 0))
+admin_frame.pack(fill=tk.BOTH, expand=True)
 admin_frame.columnconfigure(0, weight=1)
 admin_frame.columnconfigure(1, weight=1)
 admin_frame.rowconfigure(0, weight=1)
@@ -1188,15 +1183,15 @@ admin_frame.rowconfigure(1, weight=1)
 
 ttk.Button(admin_frame, text="Neuer Laptop",
            command=_wrap_singleton("Laptop hinzufuegen", open_laptop_hinzufuegen),
-           style="MainButton.TButton").grid(row=0, column=0, padx=8, pady=8, sticky="nsew")
+           style="MainButton.TButton").grid(row=0, column=0, padx=(0, 10), pady=(0, 10), sticky="nsew")
 ttk.Button(admin_frame, text="Neues Ladekabel",
            command=_wrap_singleton("Ladekabel hinzufuegen", open_ladekabel_hinzufuegen),
-           style="MainButton.TButton").grid(row=0, column=1, padx=8, pady=8, sticky="nsew")
+           style="MainButton.TButton").grid(row=0, column=1, padx=(10, 0), pady=(0, 10), sticky="nsew")
 ttk.Button(admin_frame, text="Neuer Lagerplatz",
            command=_wrap_singleton("Lagerplatz hinzufuegen", open_lager_hinzufuegen),
-           style="MainButton.TButton").grid(row=1, column=0, padx=8, pady=8, sticky="nsew")
+           style="MainButton.TButton").grid(row=1, column=0, padx=(0, 10), pady=(10, 0), sticky="nsew")
 ttk.Button(admin_frame, text="Aktueller Bestand",
            command=_wrap_singleton("Bestand", open_laptop_status),
-           style="MainButton.TButton").grid(row=1, column=1, padx=8, pady=8, sticky="nsew")
+           style="MainButton.TButton").grid(row=1, column=1, padx=(10, 0), pady=(10, 0), sticky="nsew")
 
 root.mainloop()
