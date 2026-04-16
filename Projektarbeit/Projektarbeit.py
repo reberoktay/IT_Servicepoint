@@ -134,6 +134,28 @@ def setup_styles():
               background=[("active", COLORS["accent_blue"])],
               foreground=[("active", "white")])
 
+    # Akzent-Buttons fuer die Haupt-Aktionen der Azubis: Ausleihen (gruen) und Abgeben (blau)
+    # lightcolor/darkcolor/bordercolor zusammen: einfarbiger Rand im clam-Theme
+    style.configure("MainGreen.TButton", background=COLORS["bg_card"],
+                    foreground=COLORS["green_text"], font=FONT_BTN_MAIN, padding=(24, 28),
+                    borderwidth=3, relief="solid",
+                    bordercolor=COLORS["accent_green"],
+                    lightcolor=COLORS["accent_green"],
+                    darkcolor=COLORS["accent_green"])
+    style.map("MainGreen.TButton",
+              background=[("active", COLORS["accent_green"])],
+              foreground=[("active", "white")])
+
+    style.configure("MainBlue.TButton", background=COLORS["bg_card"],
+                    foreground="#60a5fa", font=FONT_BTN_MAIN, padding=(24, 28),
+                    borderwidth=3, relief="solid",
+                    bordercolor=COLORS["accent_blue"],
+                    lightcolor=COLORS["accent_blue"],
+                    darkcolor=COLORS["accent_blue"])
+    style.map("MainBlue.TButton",
+              background=[("active", COLORS["accent_blue"])],
+              foreground=[("active", "white")])
+
     style.configure("Form.TButton", background=COLORS["accent_blue"],
                     foreground="white", font=FONT_BTN, padding=(20, 10))
     style.map("Form.TButton",
@@ -968,29 +990,29 @@ def open_laptop_status():
 
     # Stat-Kacheln
     stats_frame = ttk.Frame(new_window)
-    stats_frame.pack(fill=tk.X, padx=24, pady=(0, 16))
+    stats_frame.pack(fill=tk.X, padx=40, pady=(0, 20))
     stats_frame.columnconfigure(0, weight=1)
     stats_frame.columnconfigure(1, weight=1)
 
     green_stat = ttk.Frame(stats_frame, style="GreenStat.TFrame", padding=16)
-    green_stat.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+    green_stat.grid(row=0, column=0, sticky="ew", padx=(0, 20))
     ttk.Label(green_stat, text="VORRÄTIG", style="GreenStatTitle.TLabel").pack(anchor="w")
     ttk.Label(green_stat, text=str(len(vorr)), style="GreenStatNum.TLabel").pack(anchor="w")
 
     red_stat = ttk.Frame(stats_frame, style="RedStat.TFrame", padding=16)
-    red_stat.grid(row=0, column=1, sticky="ew", padx=(8, 0))
+    red_stat.grid(row=0, column=1, sticky="ew", padx=(20, 0))
     ttk.Label(red_stat, text="AUSGELIEHEN", style="RedStatTitle.TLabel").pack(anchor="w")
     ttk.Label(red_stat, text=str(len(ausg)), style="RedStatNum.TLabel").pack(anchor="w")
 
     # Zwei-Spalten-Layout fuer die Listen
     lists_frame = ttk.Frame(new_window)
-    lists_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=(0, 24))
-    lists_frame.columnconfigure(0, weight=1)
-    lists_frame.columnconfigure(1, weight=1)
+    lists_frame.pack(fill=tk.BOTH, expand=True, padx=40, pady=(0, 24))
+    lists_frame.columnconfigure(0, weight=1, uniform="cols")
+    lists_frame.columnconfigure(1, weight=1, uniform="cols")
 
     # --- Linke Seite: Vorrätig (Treeview) ---
     left_frame = ttk.Frame(lists_frame)
-    left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+    left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 20))
     left_frame.rowconfigure(1, weight=1)
     left_frame.columnconfigure(0, weight=1)
 
@@ -1002,8 +1024,8 @@ def open_laptop_status():
                              show="headings", height=20)
     tree_left.heading("laptop", text="Laptop", anchor="w")
     tree_left.heading("lagerplatz", text="Lagerplatz", anchor="w")
-    tree_left.column("laptop", width=200, anchor="w")
-    tree_left.column("lagerplatz", width=100, anchor="w")
+    tree_left.column("laptop", width=200, anchor="w", stretch=True)
+    tree_left.column("lagerplatz", width=120, anchor="w", stretch=True)
 
     for item in vorr:
         tree_left.insert("", "end", values=(item[2] or "", item[4] or ""))
@@ -1016,7 +1038,7 @@ def open_laptop_status():
 
     # --- Rechte Seite: Ausgeliehen (Treeview) ---
     right_frame = ttk.Frame(lists_frame)
-    right_frame.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+    right_frame.grid(row=0, column=1, sticky="nsew", padx=(20, 0))
     right_frame.rowconfigure(1, weight=1)
     right_frame.columnconfigure(0, weight=1)
 
@@ -1028,8 +1050,8 @@ def open_laptop_status():
                               show="headings", height=20)
     tree_right.heading("laptop", text="Laptop", anchor="w")
     tree_right.heading("person", text="Ausgeliehen an", anchor="w")
-    tree_right.column("laptop", width=200, anchor="w")
-    tree_right.column("person", width=200, anchor="w")
+    tree_right.column("laptop", width=150, anchor="w", stretch=True)
+    tree_right.column("person", width=250, anchor="w", stretch=True)
 
     for item in ausg:
         name = f"{item[5] or ''} {item[6] or ''}".strip()
@@ -1043,7 +1065,7 @@ def open_laptop_status():
 
     # Schliessen-Button unten - gross und deutlich sichtbar
     btn_frame = ttk.Frame(new_window)
-    btn_frame.pack(fill=tk.X, padx=24, pady=(0, 24))
+    btn_frame.pack(fill=tk.X, padx=40, pady=(0, 24))
     ttk.Button(btn_frame, text="Schliessen", command=new_window.destroy,
                style="Form.TButton").pack(side=tk.RIGHT)
 
@@ -1127,31 +1149,54 @@ content_frame.pack(expand=True, fill=tk.BOTH, padx=40, pady=(20, 40))
 # Titel zentriert
 ttk.Label(content_frame, text="Laptopverwaltung", style="Title.TLabel").pack(pady=(20, 24))
 
-# Button-Definitionen (mit Singleton-Wrapping und grossen Styles)
-MENU_ITEMS = [
-    ("Ausleihen",         _wrap_singleton("Ausleihen", open_ausleihen),            "MainButton.TButton"),
-    ("Abgeben",           _wrap_singleton("Abgeben", open_abgeben),                "MainButton.TButton"),
-    ("Neue Person",       _wrap_singleton("Person hinzufuegen", open_person_hinzufuegen),  "MainButton.TButton"),
-    ("Neuer Laptop",      _wrap_singleton("Laptop hinzufuegen", open_laptop_hinzufuegen),  "MainButton.TButton"),
-    ("Neues Ladekabel",   _wrap_singleton("Ladekabel hinzufuegen", open_ladekabel_hinzufuegen), "MainButton.TButton"),
-    ("Neuer Lagerplatz",  _wrap_singleton("Lagerplatz hinzufuegen", open_lager_hinzufuegen), "MainButton.TButton"),
-    ("Aktueller Bestand", _wrap_singleton("Bestand", open_laptop_status),          "MainButton.TButton"),
-]
 
-# Buttons im 2er-Grid — gross und flaechenfuellend
-btn_frame = ttk.Frame(content_frame)
-btn_frame.pack(padx=48, fill=tk.BOTH, expand=True)
-btn_frame.columnconfigure(0, weight=1)
-btn_frame.columnconfigure(1, weight=1)
-btn_frame.rowconfigure(0, weight=1)
-btn_frame.rowconfigure(1, weight=1)
-btn_frame.rowconfigure(2, weight=1)
-btn_frame.rowconfigure(3, weight=1)
+# ============================================================
+# GRUPPE 1: Azubi-Funktionen (Ausleihen, Abgeben, Neue Person)
+# ============================================================
+azubi_frame = ttk.Frame(content_frame)
+azubi_frame.pack(fill=tk.BOTH, expand=True, padx=48, pady=(0, 12))
+azubi_frame.columnconfigure(0, weight=1)
+azubi_frame.columnconfigure(1, weight=1)
+azubi_frame.rowconfigure(0, weight=1)
+azubi_frame.rowconfigure(1, weight=1)
 
-for i, (text, command, style) in enumerate(MENU_ITEMS):
-    row = i // 2
-    col = i % 2
-    btn = ttk.Button(btn_frame, text=text, command=command, style=style)
-    btn.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
+ttk.Button(azubi_frame, text="Ausleihen",
+           command=_wrap_singleton("Ausleihen", open_ausleihen),
+           style="MainGreen.TButton").grid(row=0, column=0, padx=8, pady=8, sticky="nsew")
+ttk.Button(azubi_frame, text="Abgeben",
+           command=_wrap_singleton("Abgeben", open_abgeben),
+           style="MainBlue.TButton").grid(row=0, column=1, padx=8, pady=8, sticky="nsew")
+# Neue Person: volle Breite (ueber beide Spalten)
+ttk.Button(azubi_frame, text="Neue Person",
+           command=_wrap_singleton("Person hinzufuegen", open_person_hinzufuegen),
+           style="MainButton.TButton").grid(row=1, column=0, columnspan=2,
+                                            padx=8, pady=8, sticky="nsew")
+
+# Visueller Trenner zwischen Azubi- und Admin-Bereich
+separator = tk.Frame(content_frame, bg=COLORS["border"], height=2)
+separator.pack(fill=tk.X, padx=80, pady=16)
+
+# ============================================================
+# GRUPPE 2: Admin-Funktionen (Laptop, Ladekabel, Lagerplatz, Bestand)
+# ============================================================
+admin_frame = ttk.Frame(content_frame)
+admin_frame.pack(fill=tk.BOTH, expand=True, padx=48, pady=(12, 0))
+admin_frame.columnconfigure(0, weight=1)
+admin_frame.columnconfigure(1, weight=1)
+admin_frame.rowconfigure(0, weight=1)
+admin_frame.rowconfigure(1, weight=1)
+
+ttk.Button(admin_frame, text="Neuer Laptop",
+           command=_wrap_singleton("Laptop hinzufuegen", open_laptop_hinzufuegen),
+           style="MainButton.TButton").grid(row=0, column=0, padx=8, pady=8, sticky="nsew")
+ttk.Button(admin_frame, text="Neues Ladekabel",
+           command=_wrap_singleton("Ladekabel hinzufuegen", open_ladekabel_hinzufuegen),
+           style="MainButton.TButton").grid(row=0, column=1, padx=8, pady=8, sticky="nsew")
+ttk.Button(admin_frame, text="Neuer Lagerplatz",
+           command=_wrap_singleton("Lagerplatz hinzufuegen", open_lager_hinzufuegen),
+           style="MainButton.TButton").grid(row=1, column=0, padx=8, pady=8, sticky="nsew")
+ttk.Button(admin_frame, text="Aktueller Bestand",
+           command=_wrap_singleton("Bestand", open_laptop_status),
+           style="MainButton.TButton").grid(row=1, column=1, padx=8, pady=8, sticky="nsew")
 
 root.mainloop()
