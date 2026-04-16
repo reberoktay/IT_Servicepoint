@@ -507,6 +507,50 @@ def open_ausleihen():
 
     stammnummer_entry.bind("<FocusOut>", stammnummer_focusout)
 
+    # Wenn Laptopnummer eingegeben wird: pruefen ob Ladekabel vorhanden ist
+    def laptopnummer_focusout(event):
+        lnr = laptopnummer_entry.get().strip()
+        ladekabel_entry.configure(state='normal')
+        ladekabel_entry.delete(0, END)
+        if not lnr:
+            return
+        laptop_data = get_laptop(lnr)
+        if not laptop_data:
+            return  # Laptop existiert nicht - wird beim Senden abgefangen
+        laptopId = laptop_data[0][0]
+        erwartetes = get_ladekabel_fuer_laptop(laptopId)
+        if erwartetes is None:
+            # Laptop hat kein Ladekabel -> Feld sperren und Hinweis anzeigen
+            ladekabel_entry.insert(0, "nicht vorhanden")
+            ladekabel_entry.configure(state='readonly')
+
+    laptopnummer_entry.bind("<FocusOut>", laptopnummer_focusout)
+
+    # Wenn vollstaendig gescannt wurde: Scanner-Nummer durch Laptopnummer ersetzen.
+    # Der echte Wert wird in einer Variable gemerkt und spaeter beim Speichern geprueft.
+    scan_state = {"echte_nummer": None}
+
+    def ladekabel_key(event):
+        # Scan endet mit Tab oder Enter (Scanner-Suffix)
+        if event.keysym not in ("Tab", "Return"):
+            return
+        # Nicht triggern, wenn Feld auf readonly steht ("nicht vorhanden"-Fall)
+        if str(ladekabel_entry.cget('state')) == 'readonly':
+            return
+        lnr = laptopnummer_entry.get().strip()
+        if not lnr:
+            return
+        gescannt = ladekabel_entry.get().strip()
+        if not gescannt or gescannt == lnr:
+            return
+        # Echte Scanner-Nummer fuer spaeteren Vergleich merken
+        scan_state["echte_nummer"] = gescannt
+        # Feld-Anzeige durch Laptopnummer ersetzen
+        ladekabel_entry.delete(0, END)
+        ladekabel_entry.insert(0, lnr)
+
+    ladekabel_entry.bind("<KeyPress>", ladekabel_key, add="+")
+
     def ausleihen_speichern():
         # Person pruefen
         stnr = stammnummer_entry.get().strip()
@@ -548,15 +592,15 @@ def open_ausleihen():
         erwartetes_ladekabel = get_ladekabel_fuer_laptop(laptopId)
         if erwartetes_ladekabel is not None:
             # Laptop hat ein Ladekabel hinterlegt -> Scan ist Pflicht
-            eingegebenes_ladekabel = ladekabel_entry.get().strip()
-            if not eingegebenes_ladekabel:
+            # Die echte gescannte Nummer wurde vom ladekabel_key-Handler abgefangen.
+            echte_nummer = scan_state["echte_nummer"]
+            if not echte_nummer:
                 show_timed_message(window, "Fehler",
                                    "Bitte Ladekabel scannen!", 5000, "error")
                 return
-            # Nummer muss mit der hinterlegten Ladekabelnummer uebereinstimmen
-            if str(erwartetes_ladekabel[1]) != eingegebenes_ladekabel:
+            if str(erwartetes_ladekabel[1]) != echte_nummer:
                 show_timed_message(window, "Fehler",
-                                   f"Falsches Ladekabel! Erwartet: {erwartetes_ladekabel[1]}",
+                                   f"Falsches Ladekabel fuer Laptop {lnr}!",
                                    5000, "error")
                 return
         else:
@@ -596,13 +640,49 @@ def open_abgeben():
     datum_entry        = add_field(window, "Datum:", 4, default=today)
     uhrzeit_entry      = add_uhrzeit_field(window, 5)
 
-    # Kopiere Laptopnummer automatisch in Lagerplatz
+    # Kopiere Laptopnummer automatisch in Lagerplatz + Ladekabel-Status aktualisieren
     def laptopnummer_changed(event):
+        lnr = laptopnummer_entry.get().strip()
         lagerplatz_entry.delete(0, END)
-        lagerplatz_entry.insert(0, laptopnummer_entry.get())
+        lagerplatz_entry.insert(0, lnr)
+
+        # Ladekabel-Feld auf "nicht vorhanden" setzen falls kein Ladekabel hinterlegt
+        ladekabel_entry.configure(state='normal')
+        ladekabel_entry.delete(0, END)
+        if not lnr:
+            return
+        laptop_data = get_laptop(lnr)
+        if not laptop_data:
+            return
+        laptopId = laptop_data[0][0]
+        erwartetes = get_ladekabel_fuer_laptop(laptopId)
+        if erwartetes is None:
+            ladekabel_entry.insert(0, "nicht vorhanden")
+            ladekabel_entry.configure(state='readonly')
 
     laptopnummer_entry.bind("<FocusOut>", laptopnummer_changed)
     laptopnummer_entry.bind("<Return>", laptopnummer_changed)
+
+    # Wie beim Ausleihen: echte Scanner-Nummer merken, Feld-Anzeige durch Laptopnummer ersetzen
+    scan_state = {"echte_nummer": None}
+
+    def ladekabel_key(event):
+        if event.keysym not in ("Tab", "Return"):
+            return
+        # Nicht triggern, wenn Feld auf readonly steht ("nicht vorhanden"-Fall)
+        if str(ladekabel_entry.cget('state')) == 'readonly':
+            return
+        lnr = laptopnummer_entry.get().strip()
+        if not lnr:
+            return
+        gescannt = ladekabel_entry.get().strip()
+        if not gescannt or gescannt == lnr:
+            return
+        scan_state["echte_nummer"] = gescannt
+        ladekabel_entry.delete(0, END)
+        ladekabel_entry.insert(0, lnr)
+
+    ladekabel_entry.bind("<KeyPress>", ladekabel_key, add="+")
 
     def abgeben_speichern():
         # Laptop pruefen
@@ -630,14 +710,14 @@ def open_abgeben():
         # Ladekabel pruefen (selbe Logik wie beim Ausleihen)
         erwartetes_ladekabel = get_ladekabel_fuer_laptop(laptopId)
         if erwartetes_ladekabel is not None:
-            eingegebenes_ladekabel = ladekabel_entry.get().strip()
-            if not eingegebenes_ladekabel:
+            echte_nummer = scan_state["echte_nummer"]
+            if not echte_nummer:
                 show_timed_message(window, "Fehler",
                                    "Bitte Ladekabel scannen!", 5000, "error")
                 return
-            if str(erwartetes_ladekabel[1]) != eingegebenes_ladekabel:
+            if str(erwartetes_ladekabel[1]) != echte_nummer:
                 show_timed_message(window, "Fehler",
-                                   f"Falsches Ladekabel! Erwartet: {erwartetes_ladekabel[1]}",
+                                   f"Falsches Ladekabel fuer Laptop {lnr}!",
                                    5000, "error")
                 return
         else:
@@ -757,18 +837,10 @@ def open_ladekabel_hinzufuegen():
                                "Bitte Ladekabel scannen!", 5000, "error")
             return
 
-        # Nummer muss identisch zur Laptopnummer sein
-        if ladekabelnummer != lnr:
-            show_timed_message(window, "Fehler",
-                               f"Ladekabelnummer ({ladekabelnummer}) stimmt nicht "
-                               f"mit Laptopnummer ({lnr}) ueberein!",
-                               6000, "error")
-            return
-
-        # Pruefen ob Ladekabelnummer schon anderswo vergeben ist
+        # Pruefen ob dieser Ladekabel-Barcode schon einem anderen Laptop zugewiesen ist
         if get_ladekabel_by_nummer(ladekabelnummer) is not None:
             show_timed_message(window, "Fehler",
-                               f"Ladekabel {ladekabelnummer} ist bereits im System!",
+                               "Dieses Ladekabel ist bereits einem Laptop zugewiesen!",
                                5000, "error")
             return
 
@@ -777,7 +849,7 @@ def open_ladekabel_hinzufuegen():
 
         window.destroy()
         show_timed_message(root, "Erfolgreich",
-                           "Das Ladekabel wurde erfolgreich hinzugefuegt!", 3000, "info")
+                           f"Ladekabel wurde Laptop {lnr} zugewiesen!", 3000, "info")
 
     add_button(window, "Hinzufuegen", lade_hinzufuegen_speichern, 3)
 
