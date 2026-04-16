@@ -163,8 +163,8 @@ def setup_styles():
 
     # Close Button (X oben rechts)
     style.configure("Close.TButton", background=COLORS["bg_topbar"],
-                    foreground=COLORS["text_muted"], font=("Segoe UI", 14),
-                    padding=(8, 2), borderwidth=0, relief="flat")
+                    foreground=COLORS["text_muted"], font=("Segoe UI", 16),
+                    padding=(18, 8), borderwidth=0, relief="flat")
     style.map("Close.TButton",
               foreground=[("active", COLORS["red_text"])],
               background=[("active", COLORS["bg_topbar"])])
@@ -285,22 +285,9 @@ def create_form_window(title):
     # Im Singleton-Tracker registrieren
     _register_window(title, window)
 
-    # Topbar
-    topbar = ttk.Frame(window, style="Topbar.TFrame")
-    topbar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=0, pady=0)
-    topbar.columnconfigure(0, weight=1)
-    ttk.Label(topbar, text="IT-Servicepoint", style="Topbar.TLabel").grid(
-        row=0, column=0, sticky="w", padx=16, pady=8)
-    ttk.Button(topbar, text="\u2715", style="Close.TButton",
-               command=window.destroy).grid(row=0, column=1, sticky="e", padx=(0, 8), pady=4)
-
-    # Separator
-    sep = tk.Frame(window, bg=COLORS["border"], height=1)
-    sep.grid(row=1, column=0, columnspan=2, sticky="ew")
-
-    # Titel
+    # Titel als Fenster-Heading (der Fenster-Schliessen-Button vom OS reicht)
     ttk.Label(window, text=title, style="Heading.TLabel").grid(
-        row=2, column=0, columnspan=2, pady=(20, 16), padx=24)
+        row=0, column=0, columnspan=2, pady=(24, 20), padx=24)
 
     # Fenster auf dem Bildschirm zentrieren - nach dem Layout aller Widgets
     def center_window():
@@ -325,7 +312,7 @@ def create_form_window(title):
 
 def add_field(window, label_text, row, focus=False, readonly=False, default=None):
     """Erstellt ein Label+Entry-Paar im Grid und gibt das Entry zurueck."""
-    actual_row = row + 3  # Offset fuer Topbar + Separator + Titel
+    actual_row = row + 1  # Offset fuer den Titel in row=0
 
     ttk.Label(window, text=label_text, style="TLabel").grid(
         row=actual_row, column=0, padx=(24, 8), pady=6, sticky="e")
@@ -344,7 +331,7 @@ def add_field(window, label_text, row, focus=False, readonly=False, default=None
 
 def add_uhrzeit_field(window, row):
     """Erstellt ein sich automatisch aktualisierendes Uhrzeit-Feld."""
-    actual_row = row + 3
+    actual_row = row + 1
 
     ttk.Label(window, text="Uhrzeit:", style="TLabel").grid(
         row=actual_row, column=0, padx=(24, 8), pady=6, sticky="e")
@@ -366,7 +353,7 @@ def add_uhrzeit_field(window, row):
 
 def add_button(window, text, command, row, style="Form.TButton"):
     """Erstellt einen Button im Grid."""
-    actual_row = row + 3
+    actual_row = row + 1
     btn = ttk.Button(window, text=text, command=command, style=style)
     btn.grid(row=actual_row, column=0, columnspan=2, padx=24, pady=(16, 24))
     return btn
@@ -977,7 +964,7 @@ def open_laptop_status():
     ttk.Label(topbar, text="IT-Servicepoint", style="Topbar.TLabel").pack(
         side=tk.LEFT, padx=16, pady=8)
     ttk.Button(topbar, text="\u2715", style="Close.TButton",
-               command=new_window.destroy).pack(side=tk.RIGHT, padx=(0, 12), pady=4)
+               command=new_window.destroy).pack(side=tk.RIGHT, padx=0, pady=0)
 
     sep = tk.Frame(new_window, bg=COLORS["border"], height=1)
     sep.pack(fill=tk.X)
@@ -1134,7 +1121,7 @@ topbar.pack(fill=tk.X)
 ttk.Label(topbar, text="IT-Servicepoint", style="Topbar.TLabel").pack(
     side=tk.LEFT, padx=16, pady=8)
 ttk.Button(topbar, text="\u2715", style="Close.TButton",
-           command=root.destroy).pack(side=tk.RIGHT, padx=(0, 12), pady=4)
+           command=root.destroy).pack(side=tk.RIGHT, padx=0, pady=0)
 
 # Separator
 sep = tk.Frame(root, bg=COLORS["border"], height=1)
