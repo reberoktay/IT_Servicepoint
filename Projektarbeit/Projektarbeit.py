@@ -523,6 +523,11 @@ def get_ladekabel_by_nummer(ladekabelnummer):
                       (ladekabelnummer,))
     return result[0] if result else None
 
+def get_laptop_by_id(laptopId):
+    """Gibt den Laptop anhand seiner DB-ID zurueck, oder None."""
+    result = db_query('SELECT * FROM laptop WHERE id = ?', (laptopId,))
+    return result[0] if result else None
+
 
 # ==================== Inaktive Azubis ====================
 
@@ -607,8 +612,9 @@ def open_ausleihen():
 
     laptopnummer_entry.bind("<FocusOut>", laptopnummer_focusout)
 
-    # Wenn vollstaendig gescannt wurde: Scanner-Nummer durch Laptopnummer ersetzen.
-    # Der echte Wert wird in einer Variable gemerkt und spaeter beim Speichern geprueft.
+    # Wenn vollstaendig gescannt wurde: sofort in der DB pruefen, welchem Laptop
+    # das Ladekabel gehoert, und die zugehoerige Laptopnummer anzeigen.
+    # Bei falschem oder unbekanntem Ladekabel -> direkte Fehlermeldung.
     scan_state = {"echte_nummer": None}
 
     def ladekabel_key(event):
@@ -618,17 +624,37 @@ def open_ausleihen():
         # Nicht triggern, wenn Feld auf readonly steht ("nicht vorhanden"-Fall)
         if str(ladekabel_entry.cget('state')) == 'readonly':
             return
-        lnr = laptopnummer_entry.get().strip()
-        if not lnr:
-            return
         gescannt = ladekabel_entry.get().strip()
-        if not gescannt or gescannt == lnr:
+        if not gescannt:
             return
-        # Echte Scanner-Nummer fuer spaeteren Vergleich merken
+
+        # In der DB nachschauen: welchem Laptop gehoert dieses Ladekabel?
+        kabel = get_ladekabel_by_nummer(gescannt)
+        if kabel is None:
+            # Barcode ist nicht im System hinterlegt
+            scan_state["echte_nummer"] = None
+            ladekabel_entry.delete(0, END)
+            show_timed_message(window, "Fehler",
+                               f"Ladekabel mit Barcode {gescannt} ist nicht im System!",
+                               5000, "error")
+            return
+
+        # Ladekabel gefunden -> zugehoerigen Laptop ermitteln
         scan_state["echte_nummer"] = gescannt
-        # Feld-Anzeige durch Laptopnummer ersetzen
-        ladekabel_entry.delete(0, END)
-        ladekabel_entry.insert(0, lnr)
+        zugehoeriger_laptop = get_laptop_by_id(kabel[2])  # kabel = (id, ladekabelnummer, laptopId)
+        if zugehoeriger_laptop:
+            # Anzeige: die Laptopnummer, zu der das Ladekabel tatsaechlich gehoert
+            ladekabel_entry.delete(0, END)
+            ladekabel_entry.insert(0, str(zugehoeriger_laptop[1]))  # laptop = (id, laptopnummer, beschreibung)
+
+            # Stimmt es mit der eingegebenen Laptopnummer ueberein?
+            lnr = laptopnummer_entry.get().strip()
+            if lnr and str(zugehoeriger_laptop[1]) != lnr:
+                show_timed_message(window, "Fehler",
+                                   f"Falsches Ladekabel! Gehoert zu Laptop {zugehoeriger_laptop[1]}, nicht zu {lnr}.",
+                                   5000, "error")
+        else:
+            ladekabel_entry.delete(0, END)
 
     ladekabel_entry.bind("<KeyPress>", ladekabel_key, add="+")
 
@@ -754,7 +780,7 @@ def open_abgeben():
     laptopnummer_entry.bind("<FocusOut>", laptopnummer_changed)
     laptopnummer_entry.bind("<Return>", laptopnummer_changed)
 
-    # Wie beim Ausleihen: echte Scanner-Nummer merken, Feld-Anzeige durch Laptopnummer ersetzen
+    # Wie beim Ausleihen: sofort in der DB pruefen, welchem Laptop das Ladekabel gehoert
     scan_state = {"echte_nummer": None}
 
     def ladekabel_key(event):
@@ -763,15 +789,33 @@ def open_abgeben():
         # Nicht triggern, wenn Feld auf readonly steht ("nicht vorhanden"-Fall)
         if str(ladekabel_entry.cget('state')) == 'readonly':
             return
-        lnr = laptopnummer_entry.get().strip()
-        if not lnr:
-            return
         gescannt = ladekabel_entry.get().strip()
-        if not gescannt or gescannt == lnr:
+        if not gescannt:
             return
+
+        # In der DB nachschauen: welchem Laptop gehoert dieses Ladekabel?
+        kabel = get_ladekabel_by_nummer(gescannt)
+        if kabel is None:
+            scan_state["echte_nummer"] = None
+            ladekabel_entry.delete(0, END)
+            show_timed_message(window, "Fehler",
+                               f"Ladekabel mit Barcode {gescannt} ist nicht im System!",
+                               5000, "error")
+            return
+
         scan_state["echte_nummer"] = gescannt
-        ladekabel_entry.delete(0, END)
-        ladekabel_entry.insert(0, lnr)
+        zugehoeriger_laptop = get_laptop_by_id(kabel[2])
+        if zugehoeriger_laptop:
+            ladekabel_entry.delete(0, END)
+            ladekabel_entry.insert(0, str(zugehoeriger_laptop[1]))
+
+            lnr = laptopnummer_entry.get().strip()
+            if lnr and str(zugehoeriger_laptop[1]) != lnr:
+                show_timed_message(window, "Fehler",
+                                   f"Falsches Ladekabel! Gehoert zu Laptop {zugehoeriger_laptop[1]}, nicht zu {lnr}.",
+                                   5000, "error")
+        else:
+            ladekabel_entry.delete(0, END)
 
     ladekabel_entry.bind("<KeyPress>", ladekabel_key, add="+")
 
