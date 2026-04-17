@@ -397,7 +397,9 @@ def add_field(window, label_text, row, focus=False, readonly=False, default=None
     if default and not readonly:
         entry.insert(0, default)
     if focus:
-        entry.focus_set()
+        # Verzoegert fokussieren — nach einem Passwort-Dialog ist das Fenster
+        # beim sofortigen focus_set() noch nicht aktiv, der WM ignoriert es dann.
+        window.after(150, lambda: (window.lift(), entry.focus_force()))
     return entry
 
 
