@@ -433,46 +433,96 @@ def add_button(window, text, command, row, style="Form.TButton"):
     return btn
 
 
-def make_scan_only(entry, max_gap_ms=50):
+def make_scan_only(entry, max_gap_ms=80):
     """Macht ein Entry-Feld zu einem Nur-Scan-Feld.
 
     Ein Barcode-Scanner 'tippt' Zeichen in unter 30ms Abstand, ein Mensch
-    braucht >100ms pro Taste. Wir akzeptieren nur Eingaben, bei denen
-    aufeinanderfolgende Zeichen weniger als max_gap_ms auseinanderliegen.
-    Paste wird komplett blockiert.
+    braucht >100ms pro Taste.
+
+    Ansatz: JEDE Tastatureingabe wird abgefangen und in einen internen Puffer
+    geschrieben. Erst wenn ein Abschluss-Zeichen kommt (Tab/Enter vom Scanner-
+    Suffix), wird geprueft, ob die gesamte Eingabe schnell genug war.
+    Wenn ja -> Puffer ins Entry-Feld schreiben. Wenn nein -> Puffer verwerfen.
+    Das Entry-Feld selbst bleibt waehrend der Eingabe leer, so dass manuelle
+    Tastatureingaben nie sichtbar werden.
     """
-    state = {"last_time": 0, "scanning": False}
+    state = {
+        "buffer": [],       # gesammelte Zeichen
+        "times": [],        # Zeitstempel pro Zeichen
+        "flush_id": None,   # ID des Auto-Flush-Timers
+    }
+
+    def flush_buffer():
+        """Verwirft den Puffer nach Timeout (kein Tab/Enter gekommen)."""
+        state["buffer"].clear()
+        state["times"].clear()
+        state["flush_id"] = None
+
+    def accept_buffer():
+        """Prueft ob die Eingabegeschwindigkeit einem Scanner entspricht
+        und schreibt den Puffer ins Entry-Feld wenn ja."""
+        chars = state["buffer"]
+        times = state["times"]
+
+        if len(chars) < 2:
+            # Einzelne Zeichen koennen kein Scan sein
+            flush_buffer()
+            return
+
+        # Maximalen Abstand zwischen aufeinanderfolgenden Zeichen pruefen
+        gaps = [times[i] - times[i - 1] for i in range(1, len(times))]
+        if all(g <= max_gap_ms for g in gaps):
+            # Schnell genug -> ins Feld schreiben
+            scanned_text = "".join(chars)
+            entry.delete(0, END)
+            entry.insert(0, scanned_text)
+            # Scan-fertig-Event ausloesen, damit der ladekabel_key-Handler triggert
+            entry.event_generate("<<ScanComplete>>")
+        # Sonst: stille Verwerfung (Mensch hat getippt)
+
+        flush_buffer()
 
     def on_key(event):
-        # Steuertasten (Tab, Enter, Backspace zum Loeschen, Pfeile etc.) erlauben
-        if event.keysym in ("Tab", "Return", "BackSpace", "Delete",
-                            "Left", "Right", "Home", "End"):
-            return None
-
-        # Nur druckbare Zeichen pruefen
-        if not event.char or not event.char.isprintable():
-            return None
-
-        now = int(time.time() * 1000)
-        gap = now - state["last_time"]
-
-        if state["last_time"] == 0:
-            # Erstes Zeichen - Timer starten, zulassen
-            state["last_time"] = now
-            state["scanning"] = True
-            # Nach max_gap_ms * 3 ohne weiteres Zeichen -> Feld wurde "fertig gescannt"
-            entry.after(max_gap_ms * 3, lambda: state.update({"last_time": 0, "scanning": False}))
-            return None
-
-        if gap > max_gap_ms:
-            # Zu langsam - das ist eine Tastatureingabe, blockieren
+        # Steuertasten die das Feld steuern: Feld leeren erlauben
+        if event.keysym in ("BackSpace", "Delete"):
+            entry.delete(0, END)
+            flush_buffer()
             return "break"
 
-        state["last_time"] = now
-        return None
+        # Tab/Enter = Ende der Scanner-Eingabe -> Puffer auswerten
+        if event.keysym in ("Tab", "Return"):
+            if state["buffer"]:
+                # Auto-Flush-Timer stoppen
+                if state["flush_id"] is not None:
+                    entry.after_cancel(state["flush_id"])
+                    state["flush_id"] = None
+                accept_buffer()
+            return "break"
+
+        # Navigation und Modifier durchlassen ohne zu puffern
+        if event.keysym in ("Left", "Right", "Home", "End", "Shift_L",
+                            "Shift_R", "Control_L", "Control_R", "Alt_L",
+                            "Alt_R", "Caps_Lock"):
+            return "break"
+
+        # Nur druckbare Zeichen puffern
+        if not event.char or not event.char.isprintable():
+            return "break"
+
+        now = int(time.time() * 1000)
+        state["buffer"].append(event.char)
+        state["times"].append(now)
+
+        # Auto-Flush-Timer (zurueck)setzen: wenn nach dem letzten Zeichen
+        # laenger als max_gap_ms * 4 nichts kommt, Puffer verwerfen
+        if state["flush_id"] is not None:
+            entry.after_cancel(state["flush_id"])
+        state["flush_id"] = entry.after(max_gap_ms * 4, flush_buffer)
+
+        # Zeichen NICHT ins Entry lassen
+        return "break"
 
     def on_paste(event):
-        # Paste komplett blockieren
         return "break"
 
     entry.bind("<KeyPress>", on_key)
@@ -500,13 +550,13 @@ def passwort_pruefen():
 # ==================== DB-Abfragen ====================
 
 def get_person(stammnummer):
-    return db_query('SELECT * FROM personen WHERE stammnummer= ' + stammnummer)
+    return db_query('SELECT * FROM personen WHERE stammnummer = ?', (stammnummer,))
 
 def get_laptop(laptopnummer):
-    return db_query('SELECT * FROM laptop WHERE laptopnummer= ' + laptopnummer)
+    return db_query('SELECT * FROM laptop WHERE laptopnummer = ?', (laptopnummer,))
 
 def get_lagerplatz(lagerplatz):
-    return db_query('SELECT * FROM lagerplatz WHERE lagerplatz= ' + lagerplatz)
+    return db_query('SELECT * FROM lagerplatz WHERE lagerplatz = ?', (lagerplatz,))
 
 def get_laptop_status():
     return db_query('SELECT * FROM laptop_status')
@@ -618,9 +668,6 @@ def open_ausleihen():
     scan_state = {"echte_nummer": None}
 
     def ladekabel_key(event):
-        # Scan endet mit Tab oder Enter (Scanner-Suffix)
-        if event.keysym not in ("Tab", "Return"):
-            return
         # Nicht triggern, wenn Feld auf readonly steht ("nicht vorhanden"-Fall)
         if str(ladekabel_entry.cget('state')) == 'readonly':
             return
@@ -656,7 +703,7 @@ def open_ausleihen():
         else:
             ladekabel_entry.delete(0, END)
 
-    ladekabel_entry.bind("<KeyPress>", ladekabel_key, add="+")
+    ladekabel_entry.bind("<<ScanComplete>>", ladekabel_key)
 
     def ausleihen_speichern():
         # Person pruefen
@@ -784,8 +831,6 @@ def open_abgeben():
     scan_state = {"echte_nummer": None}
 
     def ladekabel_key(event):
-        if event.keysym not in ("Tab", "Return"):
-            return
         # Nicht triggern, wenn Feld auf readonly steht ("nicht vorhanden"-Fall)
         if str(ladekabel_entry.cget('state')) == 'readonly':
             return
@@ -817,7 +862,7 @@ def open_abgeben():
         else:
             ladekabel_entry.delete(0, END)
 
-    ladekabel_entry.bind("<KeyPress>", ladekabel_key, add="+")
+    ladekabel_entry.bind("<<ScanComplete>>", ladekabel_key)
 
     def abgeben_speichern():
         # Laptop pruefen
