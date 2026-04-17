@@ -126,13 +126,12 @@ def setup_styles():
     style.map("Secondary.TButton",
               background=[("active", COLORS["bg_hover"]), ("pressed", COLORS["border"])])
 
-    # Grosse Buttons fuer Hauptfenster (farblos, blau bei Hover)
+    # Grosse Buttons fuer Hauptfenster (farblos, beim Hover dezent graulich)
     style.configure("MainButton.TButton", background=COLORS["bg_card"],
                     foreground=COLORS["text"], font=FONT_BTN_MAIN, padding=(24, 28),
                     borderwidth=1, relief="solid")
     style.map("MainButton.TButton",
-              background=[("active", COLORS["accent_blue"])],
-              foreground=[("active", "white")])
+              background=[("active", COLORS["bg_hover"]), ("pressed", COLORS["border"])])
 
     # Akzent-Buttons fuer die Haupt-Aktionen der Azubis: Ausleihen (gruen) und Abgeben (blau)
     # Permanent gefuellt, Hover wird minimal heller
@@ -273,6 +272,79 @@ def db_query(sql, params=(), fetch=True, commit=False):
         conn.commit()
     conn.close()
     return result
+
+
+def init_db():
+    """Stellt sicher, dass alle Tabellen und der laptop_status-View existieren.
+    Behebt den Schema-Drift zwischen ausgelieferter DB und aktuellem Code
+    (z.B. ladekabel-Tabelle fehlte in der mitgelieferten DB).
+    Idempotent: existierende Objekte werden nicht angefasst."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS personen (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nachname TEXT,
+        vorname TEXT,
+        stammnummer INT UNIQUE NOT NULL
+    )''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS laptop (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        laptopnummer INT UNIQUE NOT NULL,
+        beschreibung TEXT
+    )''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS lagerplatz (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lagerplatz INT UNIQUE
+    )''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS laptop_lagerplatz (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lagerplatzId INT UNIQUE,
+        laptopId INT UNIQUE,
+        FOREIGN KEY(laptopId) REFERENCES laptop(id),
+        FOREIGN KEY(lagerplatzId) REFERENCES lagerplatz(id)
+    )''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS ausleihen (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        personenId INT,
+        laptopId INT,
+        datum_ausleih TEXT,
+        uhrzeit_ausleih TEXT,
+        datum_zurueck TEXT,
+        uhrzeit_zurueck TEXT,
+        FOREIGN KEY(personenId) REFERENCES personen(id),
+        FOREIGN KEY(laptopId) REFERENCES laptop(id)
+    )''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS ladekabel (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ladekabelnummer INT UNIQUE NOT NULL,
+        laptopId INT UNIQUE NOT NULL,
+        FOREIGN KEY(laptopId) REFERENCES laptop(id)
+    )''')
+
+    cursor.execute('''CREATE VIEW IF NOT EXISTS laptop_status AS
+        SELECT lap.id as laptopId
+             , lap.laptopnummer
+             , lap.beschreibung
+             , laplag.lagerplatzId
+             , lag.lagerplatz
+             , pers.vorname
+             , pers.nachname
+        FROM laptop lap
+        LEFT JOIN laptop_lagerplatz laplag ON lap.id = laplag.laptopId
+        LEFT JOIN lagerplatz lag ON laplag.lagerplatzId = lag.id
+        LEFT JOIN (SELECT * FROM ausleihen WHERE datum_zurueck IS NULL) ausl
+               ON lap.id = ausl.laptopId
+        LEFT JOIN personen pers ON ausl.personenId = pers.id
+    ''')
+
+    conn.commit()
+    conn.close()
 
 
 def create_form_window(title):
@@ -619,13 +691,23 @@ def open_ausleihen():
         datum = datum_entry.get()
         uhrzeit = datetime.now().strftime("%H:%M:%S")
 
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''INSERT INTO ausleihen (personenId, laptopId, datum_ausleih, uhrzeit_ausleih)
-                          VALUES (?, ?, ?, ?)''', (personId, laptopId, datum, uhrzeit))
-        cursor.execute('DELETE FROM laptop_lagerplatz WHERE laptopId = ?', (laptopId,))
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute('''INSERT INTO ausleihen (personenId, laptopId, datum_ausleih, uhrzeit_ausleih)
+                              VALUES (?, ?, ?, ?)''', (personId, laptopId, datum, uhrzeit))
+            cursor.execute('DELETE FROM laptop_lagerplatz WHERE laptopId = ?', (laptopId,))
+            conn.commit()
+            conn.close()
+        except sqlite3.Error as e:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            show_timed_message(window, "Fehler",
+                               f"Ausleihe konnte nicht gespeichert werden: {e}",
+                               5000, "error")
+            return
 
         window.destroy()
         show_timed_message(root, "Erfolgreich",
@@ -748,15 +830,26 @@ def open_abgeben():
         datum = datum_entry.get()
         uhrzeit = datetime.now().strftime("%H:%M:%S")
 
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''UPDATE ausleihen SET datum_zurueck = ?, uhrzeit_zurueck = ? 
-                  WHERE laptopId = ? AND datum_zurueck IS NULL AND uhrzeit_zurueck IS NULL''',
-               (datum, uhrzeit, laptopId))
-        cursor.execute('''INSERT INTO laptop_lagerplatz (lagerplatzId, laptopId)
-                          VALUES (?, ?)''', (lagerplatzId, laptopId))
-        conn.commit()
-        conn.close()
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute('''UPDATE ausleihen SET datum_zurueck = ?, uhrzeit_zurueck = ? 
+                      WHERE laptopId = ? AND datum_zurueck IS NULL AND uhrzeit_zurueck IS NULL''',
+                   (datum, uhrzeit, laptopId))
+            cursor.execute('''INSERT INTO laptop_lagerplatz (lagerplatzId, laptopId)
+                              VALUES (?, ?)''', (lagerplatzId, laptopId))
+            conn.commit()
+            conn.close()
+        except sqlite3.IntegrityError:
+            # Lagerplatz bereits belegt oder Laptop bereits an einem Lagerplatz (UNIQUE-Verletzung)
+            try:
+                conn.close()
+            except Exception:
+                pass
+            show_timed_message(window, "Fehler",
+                               f"Lagerplatz {lp} ist bereits belegt!",
+                               5000, "error")
+            return
 
         window.destroy()
         show_timed_message(root, "Erfolgreich",
@@ -887,8 +980,14 @@ def open_ladekabel_hinzufuegen():
                                5000, "error")
             return
 
-        db_query('INSERT INTO ladekabel (ladekabelnummer, laptopId) VALUES (?, ?)',
-                 (ladekabelnummer, laptopId), fetch=False, commit=True)
+        try:
+            db_query('INSERT INTO ladekabel (ladekabelnummer, laptopId) VALUES (?, ?)',
+                     (ladekabelnummer, laptopId), fetch=False, commit=True)
+        except sqlite3.IntegrityError as e:
+            show_timed_message(window, "Fehler",
+                               f"Ladekabel konnte nicht gespeichert werden: {e}",
+                               5000, "error")
+            return
 
         window.destroy()
         show_timed_message(root, "Erfolgreich",
@@ -978,8 +1077,14 @@ def open_person_hinzufuegen():
                                "Bitte Vorname eingeben!", 5000, "error")
             return
 
-        db_query('INSERT INTO personen (nachname, vorname, stammnummer) VALUES (?, ?, ?)',
-                 (nachname, vorname, stammnummer), fetch=False, commit=True)
+        try:
+            db_query('INSERT INTO personen (nachname, vorname, stammnummer) VALUES (?, ?, ?)',
+                     (nachname, vorname, stammnummer), fetch=False, commit=True)
+        except sqlite3.IntegrityError as e:
+            show_timed_message(window, "Fehler",
+                               f"Person konnte nicht gespeichert werden: {e}",
+                               5000, "error")
+            return
 
         show_timed_message(root, "Erfolgreich",
                            "Die Person wurde erfolgreich hinzugefuegt!", 3000, "info")
@@ -1169,6 +1274,7 @@ root.attributes('-fullscreen', True)
 root.bind("<Escape>", lambda e: root.attributes('-fullscreen', False))
 
 setup_styles()
+init_db()
 
 # Topbar
 topbar = ttk.Frame(root, style="Topbar.TFrame")
@@ -1209,9 +1315,9 @@ ttk.Button(azubi_frame, text="Neue Person",
            style="MainButton.TButton").grid(row=1, column=0, columnspan=2,
                                             padx=0, pady=(10, 0), sticky="nsew")
 
-# Visueller Trenner zwischen Azubi- und Admin-Bereich - subtil, viel Luft drumherum
-separator = tk.Frame(content_frame, bg=COLORS["border"], height=1)
-separator.pack(fill=tk.X, padx=120, pady=32)
+# Visueller Trenner zwischen Azubi- und Admin-Bereich - deutlich sichtbar
+separator = tk.Frame(content_frame, bg=COLORS["text_muted"], height=3)
+separator.pack(fill=tk.X, padx=40, pady=32)
 
 # ============================================================
 # GRUPPE 2: Admin-Funktionen (Laptop, Ladekabel, Lagerplatz, Bestand)
